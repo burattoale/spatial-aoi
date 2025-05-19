@@ -33,7 +33,7 @@ class HiddenMM(object):
                             [self._params.eta * self._params.q, 1 - self._params.eta * self._params.q]])
         self._steady_state = self._compute_steady_state()
         self._emission_matrix = self._fill_emission_matrix()
-        self._emission_matrix /= np.sum(self._emission_matrix, axis=1, keepdims=True)
+        
         # sample the initial state of the chain from steady state probabilities
         # the current visible state is drawn from the row of the emission matrix
         self._hidden_state = self.rng.choice(self._params.X_symbols, p=self._steady_state)
@@ -113,7 +113,7 @@ class HiddenMM(object):
                 total *= ps
             return total
         if y == "C":
-            return np.clip(1 - ps - pi, 0, 1)
+            return 1 - ps - pi
         if y == "I":
             return pi
         raise NotImplementedError
@@ -121,7 +121,7 @@ class HiddenMM(object):
 
 @jit
 def lam(d:int, alpha:float=0.02, R:float=10):
-    return 1 # 1 / (1 + d * R)**alpha
+    return 1#1 / (1 + d * R)**alpha
 
 @jit   
 def cond_prob(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
@@ -143,7 +143,7 @@ def cond_prob(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
             total *= ps
         return total
     if y == "C":
-        return float(np.fmax(np.fmin(1 - ps - pi, 1), 0))
+        return 1 - ps - pi
     if y == "I":
         return pi
     raise NotImplementedError
@@ -158,7 +158,7 @@ def sequence_entropy(lam:float):
 
 
 if __name__ == "__main__":
-    sim_length = 10
+    sim_length = 1000
     # sim parameters
     q = 5e-3
     eta = 5
@@ -167,16 +167,17 @@ if __name__ == "__main__":
     rho = 5e-2
     R = 10
     K = 1
-    m = 1  #math.floor(rho * np.pi * R*K)
+    m = 1#math.floor(rho * np.pi * R*K)
     print(f"Number of sensors: {m}")
     alpha = 0.02
     x_symbols = ["0", "1"]
     y_symbols = ["0", "1", "C", "I"]
 
-    params = SimulationParameters(q, eta, zeta, epsilon, rho, K, alpha, R, x_symbols, y_symbols)
+    params = SimulationParameters(q, eta, zeta, epsilon, m, K, alpha, R, x_symbols, y_symbols)
 
     hmm = HiddenMM(params) # process markov chain
     rng = np.random.default_rng()
+    print(hmm.B)
 
     Y = np.empty(sim_length, dtype=object)
     Y[0] = hmm.state
