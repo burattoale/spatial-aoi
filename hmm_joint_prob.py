@@ -2,23 +2,50 @@ import numpy as np
 import math
 from numba import jit
 from matplotlib import pyplot as plt
+from dataclasses import dataclass
+from typing import List
 
-class SourceMM(object):
+@dataclass
+class SimulationParameters(object):
     """
-    Contains the binary markov process state of the source
+    Keep organized all the parameters of the simulation
+    """
+    q:float
+    eta:float
+    zeta:float
+    epsilon:float
+    m:int
+    K:int
+    alpha:float = 0.02
+    R:float = 10
+    X_symbols:List[str] = None
+    Y_symbols:List[str] = None
+
+class HiddenMM(object):
+    """
+    Contains the matrices and parameters of a Hidden Markov Model
     """
 
-    def __init__(self, q:float, eta:float):
-        self._A = np.array([[1 - q, q],
-                            [eta * q, 1 - eta * q]])
-        self._steady_state = self._compute_steady_state()
-        self.state_names = [0, 1]
-        self.current_state = 0
+    def __init__(self, params:SimulationParameters):
+        self._params = params
         self.rng = np.random.default_rng()
+        self._A = np.array([[1 - self._params.q, self._params.q],
+                            [self._params.eta * self._params.q, 1 - self._params.eta * self._params.q]])
+        self._steady_state = self._compute_steady_state()
+        self._emission_matrix = self._fill_emission_matrix()
+        self._emission_matrix /= np.sum(self._emission_matrix, axis=1, keepdims=True)
+        # sample the initial state of the chain from steady state probabilities
+        # the current visible state is drawn from the row of the emission matrix
+        self._hidden_state = self.rng.choice(self._params.X_symbols, p=self._steady_state)
+        self._emission_state = self.rng.choice(self._params.Y_symbols, p=self._emission_matrix[int(self._hidden_state)])
 
     @property
     def A(self):
         return self._A
+    
+    @property
+    def B(self):
+        return self._emission_matrix
     
     @property
     def pi(self):
@@ -26,12 +53,17 @@ class SourceMM(object):
     
     @property
     def state(self):
-        return str(self.current_state)
+        return self._emission_state
+    
+    @property
+    def hidden_state(self):
+        return self._hidden_state
     
     def step(self):
-        next_state = self.rng.choice(self.state_names, p=self.A[self.current_state])
-        self.current_state = next_state
-        return str(self.current_state)
+        next_hidden_state = self.rng.choice(self._params.X_symbols, p=self.A[int(self._hidden_state)])
+        self._hidden_state = next_hidden_state
+        self._emission_state = self.rng.choice(self._params.Y_symbols, p=self.B[int(self._hidden_state)])
+        return self._emission_state
 
     def _compute_steady_state(self):
         dim = self.A.shape[0]
@@ -42,10 +74,54 @@ class SourceMM(object):
         bQT = np.ones(dim)
         return np.linalg.solve(QTQ,bQT)
     
+    def _fill_emission_matrix(self):
+        shape = (len(self._params.X_symbols), len(self._params.Y_symbols))
+        B = np.zeros(shape, dtype=float)
+        for i in range(shape[0]):
+            for j in range(shape[1]):
+                B[i, j] = self.cond_prob(self._params.Y_symbols[j], self._params.X_symbols[i])
+
+        return B
+    
+    def cond_prob(self, y:str, x:str):
+        """
+        Compute the conditional probability of Y=y|X=x.
+
+        .. versionchanged:: 1.5
+        All parameters are in params to make the initialization of the HMM.
+        """
+        # Read useful parameters
+        m = self._params.m
+        zeta = self._params.zeta
+        epsilon = self._params.epsilon
+        alpha = self._params.alpha
+        R = self._params.R
+        K = self._params.K
+
+        ps = m * zeta * (1 - epsilon) * (1 - zeta * (1 - epsilon))**(m-1)
+        pi = (1 - zeta * (1 - epsilon))**m
+        if y == "0" or y == "1":
+            if x == y:
+                total = 0
+                for d in range(K):
+                    total += lam(d, alpha, R) * (2*d + 1) / K**2
+                total *= ps
+            else:
+                total = 0
+                for d in range(K):
+                    total += (1-lam(d, alpha, R)) * (2*d + 1) / K**2
+                total *= ps
+            return total
+        if y == "C":
+            return np.clip(1 - ps - pi, 0, 1)
+        if y == "I":
+            return pi
+        raise NotImplementedError
+    
 
 @jit
 def lam(d:int, alpha:float=0.02, R:float=10):
-    return 1 #1 / (1 + d * R)**alpha
+    return 1 # 1 / (1 + d * R)**alpha
 
 @jit   
 def cond_prob(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
@@ -67,7 +143,7 @@ def cond_prob(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
             total *= ps
         return total
     if y == "C":
-        return 1 - ps - pi
+        return float(np.fmax(np.fmin(1 - ps - pi, 1), 0))
     if y == "I":
         return pi
     raise NotImplementedError
@@ -91,22 +167,28 @@ if __name__ == "__main__":
     rho = 5e-2
     R = 10
     K = 1
-    m = 1#math.floor(rho * np.pi * R*K)
+    m = 1  #math.floor(rho * np.pi * R*K)
     print(f"Number of sensors: {m}")
     alpha = 0.02
-
-    hmm = SourceMM(q, eta) # process markov chain
     x_symbols = ["0", "1"]
     y_symbols = ["0", "1", "C", "I"]
+
+    params = SimulationParameters(q, eta, zeta, epsilon, rho, K, alpha, R, x_symbols, y_symbols)
+
+    hmm = HiddenMM(params) # process markov chain
     rng = np.random.default_rng()
-    # sbagliato!!! Il processo Y scritto così è slegato dal processo hidden
-    Y = rng.choice(y_symbols, size=sim_length)
+
+    Y = np.empty(sim_length, dtype=object)
+    Y[0] = hmm.state
 
     cond_prob0 = cond_prob(Y[0], "0", zeta, epsilon, m, K, alpha)
     cond_prob1 = cond_prob(Y[0], "1", zeta, epsilon, m, K, alpha)
     alpha_vec = np.empty(2)
     alpha_vec[0] = hmm.pi[0] * cond_prob0
     alpha_vec[1] = hmm.pi[1] * cond_prob1
+    cs = np.zeros(sim_length)  # scaling
+    cs[0] = np.sum(alpha_vec)
+    alpha_vec /= cs[0]
 
     ###### Main simulation loop ######
     # for i in range(1, sim_length):
@@ -123,26 +205,36 @@ if __name__ == "__main__":
     ###### Alternative formulation for lambda_n ######
     try:
         lambda_other = np.log(cond_prob(Y[0], "0", zeta, epsilon, m, K, alpha) / cond_prob(Y[0], "1", zeta, epsilon, m, K, alpha)) + np.log(hmm.A[0,0]/hmm.A[0,1])
-    except:
+    except ZeroDivisionError:
         lambda_other = np.log(hmm.A[0,0]/hmm.A[0,1])
     entropies = np.zeros(sim_length)
+    
     for i in range (1, sim_length):
-        print(Y[i])
+        Y[i] = hmm.step()
         num = cond_prob(Y[i], "0", zeta, epsilon, m, K, alpha)
         den = cond_prob(Y[i], "1", zeta, epsilon, m, K, alpha)
         try:
             first_part = np.log(num/den)
-        except:
-            first_part=0
+        except ZeroDivisionError:
+            first_part = 0
         lambda_other = first_part + np.log((hmm.A[0,0] + hmm.A[1,0] * np.exp(-lambda_other)) / (hmm.A[0,1] + hmm.A[1,1] * np.exp(-lambda_other)))
-        print(lambda_other)
+        temp0, temp1 = 0, 0
+        for id in range(2): # only two states
+            temp0 += alpha_vec[id] * hmm.A[id, 0]
+            temp1 += alpha_vec[id] * hmm.A[id, 1]
+        alpha_vec[0] = temp0 * cond_prob(Y[i], "0", zeta, epsilon, m, K, alpha)
+        alpha_vec[1] = temp1 * cond_prob(Y[i], "1", zeta, epsilon, m, K, alpha)
+        cs[i] = np.sum(alpha_vec)
+        alpha_vec /= cs[i]
         entropies[i] = sequence_entropy(lambda_other)
 
-    # print(f"Entropy alpha method: {sequence_entropy(lambda_n)}")
+    lambda_n = np.log(alpha_vec[0]/alpha_vec[1])
+    print(f"Entropy alpha method: {sequence_entropy(lambda_n)}")
     print(f"Entropy Liva method: {sequence_entropy(lambda_other)}")
+    print(f"P(Y^n): {1/np.prod(cs)}")
 
     plt.figure()
-    source_entropy = - hmm.pi[0] * np.log(hmm.pi[0]) - hmm.pi[1] * np.log(hmm.pi[1])
+    source_entropy = - hmm.pi[0] * np.log2(hmm.pi[0]) - hmm.pi[1] * np.log2(hmm.pi[1])
     plt.plot(np.arange(sim_length), entropies, label=r"$H(X_n \mid Y^n=y^n)$")
     plt.plot(np.arange(sim_length), np.ones(sim_length) * source_entropy, linestyle="-.", label="$H(X)$")
     plt.grid(True)
