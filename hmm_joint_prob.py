@@ -1,160 +1,9 @@
 import numpy as np
-import math
-from numba import jit
 from matplotlib import pyplot as plt
-from dataclasses import dataclass
-from typing import List
 
-@dataclass
-class SimulationParameters(object):
-    """
-    Keep organized all the parameters of the simulation
-    """
-    q:float
-    eta:float
-    zeta:float
-    epsilon:float
-    m:int
-    K:int
-    alpha:float = 0.02
-    R:float = 10
-    X_symbols:List[str] = None
-    Y_symbols:List[str] = None
-
-class HiddenMM(object):
-    """
-    Contains the matrices and parameters of a Hidden Markov Model
-    """
-
-    def __init__(self, params:SimulationParameters):
-        self._params = params
-        self.rng = np.random.default_rng()
-        self._A = np.array([[1 - self._params.q, self._params.q],
-                            [self._params.eta * self._params.q, 1 - self._params.eta * self._params.q]])
-        self._steady_state = self._compute_steady_state()
-        self._emission_matrix = self._fill_emission_matrix()
-        
-        # sample the initial state of the chain from steady state probabilities
-        # the current visible state is drawn from the row of the emission matrix
-        self._hidden_state = self.rng.choice(self._params.X_symbols, p=self._steady_state)
-        self._emission_state = self.rng.choice(self._params.Y_symbols, p=self._emission_matrix[int(self._hidden_state)])
-
-    @property
-    def A(self):
-        return self._A
-    
-    @property
-    def B(self):
-        return self._emission_matrix
-    
-    @property
-    def pi(self):
-        return self._steady_state
-    
-    @property
-    def state(self):
-        return self._emission_state
-    
-    @property
-    def hidden_state(self):
-        return self._hidden_state
-    
-    def step(self):
-        next_hidden_state = self.rng.choice(self._params.X_symbols, p=self.A[int(self._hidden_state)])
-        self._hidden_state = next_hidden_state
-        self._emission_state = self.rng.choice(self._params.Y_symbols, p=self.B[int(self._hidden_state)])
-        return self._emission_state
-
-    def _compute_steady_state(self):
-        dim = self.A.shape[0]
-        q = (self.A-np.eye(dim))
-        ones = np.ones(dim)
-        q = np.c_[q,ones]
-        QTQ = np.dot(q, q.T)
-        bQT = np.ones(dim)
-        return np.linalg.solve(QTQ,bQT)
-    
-    def _fill_emission_matrix(self):
-        shape = (len(self._params.X_symbols), len(self._params.Y_symbols))
-        B = np.zeros(shape, dtype=float)
-        for i in range(shape[0]):
-            for j in range(shape[1]):
-                B[i, j] = self.cond_prob(self._params.Y_symbols[j], self._params.X_symbols[i])
-
-        return B
-    
-    def cond_prob(self, y:str, x:str):
-        """
-        Compute the conditional probability of Y=y|X=x.
-
-        .. versionchanged:: 1.5
-        All parameters are in params to make the initialization of the HMM.
-        """
-        # Read useful parameters
-        m = self._params.m
-        zeta = self._params.zeta
-        epsilon = self._params.epsilon
-        alpha = self._params.alpha
-        R = self._params.R
-        K = self._params.K
-
-        ps = m * zeta * (1 - epsilon) * (1 - zeta * (1 - epsilon))**(m-1)
-        pi = (1 - zeta * (1 - epsilon))**m
-        if y == "0" or y == "1":
-            if x == y:
-                total = 0
-                for d in range(K):
-                    total += lam(d, alpha, R) * (2*d + 1) / K**2
-                total *= ps
-            else:
-                total = 0
-                for d in range(K):
-                    total += (1-lam(d, alpha, R)) * (2*d + 1) / K**2
-                total *= ps
-            return total
-        if y == "C":
-            return 1 - ps - pi
-        if y == "I":
-            return pi
-        raise NotImplementedError
-    
-
-@jit
-def lam(d:int, alpha:float=0.02, R:float=10):
-    return 1#1 / (1 + d * R)**alpha
-
-@jit   
-def cond_prob(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
-    """
-    Compute the conditional probability of Y=y|X=x
-    """
-    ps = m * zeta * (1 - epsilon) * (1 - zeta * (1 - epsilon))**(m-1)
-    pi = (1 - zeta * (1 - epsilon))**m
-    if y == "0" or y == "1":
-        if x == y:
-            total = 0
-            for d in range(K):
-                total += lam(d, alpha, R) * (2*d + 1) / K**2
-            total *= ps
-        else:
-            total = 0
-            for d in range(K):
-                total += (1-lam(d, alpha, R)) * (2*d + 1) / K**2
-            total *= ps
-        return total
-    if y == "C":
-        return 1 - ps - pi
-    if y == "I":
-        return pi
-    raise NotImplementedError
-
-@jit
-def sequence_entropy(lam:float):
-    out = 0
-    for x in [0, 1]:
-        out += np.exp(-x * lam) / (1 + np.exp(-lam)) + np.log2((1 + np.exp(-lam)) / (np.exp(-x *lam)))
-    return out
-
+from environment import HiddenMM
+from utils import SimulationParameters
+from utils import cond_prob, sequence_entropy
 
 
 if __name__ == "__main__":
@@ -177,7 +26,6 @@ if __name__ == "__main__":
 
     hmm = HiddenMM(params) # process markov chain
     rng = np.random.default_rng()
-    print(hmm.B)
 
     Y = np.empty(sim_length, dtype=object)
     Y[0] = hmm.state
@@ -190,18 +38,6 @@ if __name__ == "__main__":
     cs = np.zeros(sim_length)  # scaling
     cs[0] = np.sum(alpha_vec)
     alpha_vec /= cs[0]
-
-    ###### Main simulation loop ######
-    # for i in range(1, sim_length):
-    #     temp0, temp1 = 0, 0
-    #     for id in range(2): # only two states
-    #         temp0 += alpha_vec[id] * hmm.A[id, 0]
-    #         temp1 += alpha_vec[id] * hmm.A[id, 1]
-    #     alpha_vec[0] = temp0 * cond_prob(Y[i], "0", zeta, epsilon, m, K, alpha)
-    #     alpha_vec[1] = temp1 * cond_prob(Y[i], "1", zeta, epsilon, m, K, alpha)
-# 
-    # lambda_n = np.log(alpha_vec[0]/alpha_vec[1])
-    # print(lambda_n)
 
     ###### Alternative formulation for lambda_n ######
     try:
