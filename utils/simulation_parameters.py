@@ -12,6 +12,8 @@ class SimulationParameters(object):
     epsilon: float   # Node transmission erasure probability
     m_override: int = None # If None, m is calculated from rho. Otherwise, use this value for number of nodes.
     rho: float = 1.0   # Node density (used if m_override is None)
+    m:int = 1
+    R:int = 10
     K: int = 5         # Number of regions/buckets
     alpha: float = 2.0 # Power law exponent for node correctness & entropy calc
     beta: float = 2.0 # Power law exponent for node transmission probability

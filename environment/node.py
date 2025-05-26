@@ -78,7 +78,7 @@ class Node(object):
         :returns: The transmission probabilitz of the node.
         :rtype: float
         """
-        return (1 + self.d_idx * self.unit_radius)**(-beta)
+        return 1e-2 * (1 + self.d_idx * self.unit_radius)**(-beta)
     
     def _get_bucket_idx(self, bucket_list:List[Tuple[float,float]]) -> int:
         """
