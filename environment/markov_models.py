@@ -5,10 +5,10 @@ from utils import _compute_steady_state
 from utils import lam
 
 class DTMC(object):
-    def __init__(self, q, eta):
+    def __init__(self, q, eta, seed=None):
         self._A = np.array([[1-q, q], [eta*q, 1-eta*q]])
         self._pi = _compute_steady_state(self._A)
-        self.rng = np.random.default_rng()
+        self.rng = np.random.default_rng(seed)
         self._state = int(self.rng.choice([0, 1], p=self._pi))
 
     @property
@@ -82,7 +82,7 @@ class HiddenMM(object):
 
         return B
     
-    def cond_prob(self, y:str, x:str):
+    def cond_prob(self, y:int, x:int):
         """
         Compute the conditional probability of Y=y|X=x.
 
@@ -99,7 +99,7 @@ class HiddenMM(object):
 
         ps = m * zeta * (1 - epsilon) * (1 - zeta * (1 - epsilon))**(m-1)
         pi = (1 - zeta * (1 - epsilon))**m
-        if y == "0" or y == "1":
+        if y == 0 or y == 1:
             if x == y:
                 total = 0
                 for d in range(K):
@@ -111,8 +111,8 @@ class HiddenMM(object):
                     total += (1-lam(d, alpha, R)) * (2*d + 1) / K**2
                 total *= ps
             return total
-        if y == "C":
+        if y == 2:
             return 1 - ps - pi
-        if y == "I":
+        if y == 3:
             return pi
         raise NotImplementedError

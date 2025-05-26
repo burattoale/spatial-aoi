@@ -14,7 +14,7 @@ def cond_prob(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
     """
     ps = m * zeta * (1 - epsilon) * (1 - zeta * (1 - epsilon))**(m-1)
     pi = (1 - zeta * (1 - epsilon))**m
-    if y == "0" or y == "1":
+    if y == 0 or y == 1:
         if x == y:
             total = 0
             for d in range(K):
@@ -26,9 +26,9 @@ def cond_prob(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
                 total += (1-lam(d, alpha, R)) * (2*d + 1) / K**2
             total *= ps
         return total
-    if y == "C":
+    if y == 2:
         return 1 - ps - pi
-    if y == "I":
+    if y == 3:
         return pi
     raise NotImplementedError
 

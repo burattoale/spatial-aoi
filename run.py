@@ -22,7 +22,6 @@ if __name__ == "__main__":
     #### SIM Length ####
     sim_length = 1000
 
-    mm = DTMC(q, eta)
 
     entropies = []
     without_tx = []
@@ -37,6 +36,7 @@ if __name__ == "__main__":
         sim_entropies = []
         for _ in range(1):
             states = []
+            mm = DTMC(q, eta)
             for i in range(sim_length):
                 if i == 0:
                     x_state = mm.state

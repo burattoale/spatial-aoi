@@ -7,7 +7,7 @@ class Node(object):
     Represents the transmission node with its position, distance to center,
     and probability of having a correct transmission.
     """
-    def __init__(self, position:Tuple[float, float], unit_radius:float, buckets:List[Tuple[float,float]], alpha:float, coordinates:str="radial"):
+    def __init__(self, position:Tuple[float, float], unit_radius:float, buckets:List[Tuple[float,float]], alpha:float, beta:float, coordinates:str="radial"):
         """
         :param position: The position of the node
         :type position: Tuple[float, float]
@@ -15,8 +15,10 @@ class Node(object):
         :type unit_radius: float
         :param buckets: List of the ranges for the radius.
         :type buckets: List[Tuple[float,float]]
-        :param alpha: The exponent of the power law for the probability.
+        :param alpha: The exponent of the power law for the correct probability.
         :type alpha: float
+        :param beta: The exponent of the power law for the transmission probability.
+        :type beta: float
         :param coordinates: Specify the type of coordinates used for position. Can be radial or cartesian.
         :type coordinates: str
         """
@@ -26,6 +28,7 @@ class Node(object):
         self.distance = self._compute_distance()
         self.d_idx = self._get_bucket_idx(buckets)
         self.correct_probability = self._compute_correct_prob(alpha)
+        self.tx_probability = self._compute_tx_prob(beta)
 
     @property
     def lam(self):
@@ -34,6 +37,10 @@ class Node(object):
     @property
     def position(self):
         return self._position
+    
+    @property
+    def zeta(self):
+        return self.tx_probability
 
     def _compute_distance(self) -> float:
         """
@@ -61,6 +68,18 @@ class Node(object):
         """
         return (1 + self.d_idx * self.unit_radius)**(-alpha)
     
+    def _compute_tx_prob(self, beta:float) -> float:
+        """
+        Compute the probability that the information form this node is correct.
+
+        :param alpha: The exponent of the power law for the probability.
+        :type alpha: float
+
+        :returns: The transmission probabilitz of the node.
+        :rtype: float
+        """
+        return (1 + self.d_idx * self.unit_radius)**(-beta)
+    
     def _get_bucket_idx(self, bucket_list:List[Tuple[float,float]]) -> int:
         """
         Compute the index of the bucket in which to insert the distance of the node.
@@ -76,4 +95,4 @@ class Node(object):
 
 
     def __str__(self):
-        return f"Node position: {self.position} \nNode distance: {self.distance} \nBucket index: {self.d_idx}"
+        return f"Node position: {self.position} \nNode distance: {self.distance} \nBucket index: {self.d_idx} \nTx probability{self.zeta}"

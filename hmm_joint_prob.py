@@ -19,8 +19,14 @@ if __name__ == "__main__":
     m = 1#math.floor(rho * np.pi * R*K)
     print(f"Number of sensors: {m}")
     alpha = 0.02
-    x_symbols = ["0", "1"]
-    y_symbols = ["0", "1", "C", "I"]
+    x_symbols = [0, 1]
+    y_symbols = [0, 1, 2, 3]
+    y_translation = {
+        0:"0",
+        1:"1",
+        2:"C",
+        3:"I"
+    }
 
     params = SimulationParameters(q, eta, zeta, epsilon, m, K, alpha, R, x_symbols, y_symbols)
 
@@ -30,14 +36,13 @@ if __name__ == "__main__":
     Y = np.empty(sim_length, dtype=object)
     Y[0] = hmm.state
 
-    cond_prob0 = cond_prob(Y[0], "0", zeta, epsilon, m, K, alpha)
-    cond_prob1 = cond_prob(Y[0], "1", zeta, epsilon, m, K, alpha)
+    cond_prob0 = hmm.B[0, Y[0]]
+    cond_prob1 = hmm.B[1, Y[0]]
     alpha_vec = np.empty(2)
     alpha_vec[0] = hmm.pi[0] * cond_prob0
     alpha_vec[1] = hmm.pi[1] * cond_prob1
     cs = np.zeros(sim_length)  # scaling
-    cs[0] = np.sum(alpha_vec)
-    alpha_vec /= cs[0]
+    cs[0] = 1
 
     ###### Alternative formulation for lambda_n ######
     try:
@@ -46,6 +51,7 @@ if __name__ == "__main__":
         lambda_other = np.log(hmm.A[0,0]/hmm.A[0,1])
     entropies = np.zeros(sim_length)
     
+    counter = 1  # count how many times we did not perform scaling
     for i in range (1, sim_length):
         Y[i] = hmm.step()
         num = cond_prob(Y[i], "0", zeta, epsilon, m, K, alpha)
@@ -61,14 +67,19 @@ if __name__ == "__main__":
             temp1 += alpha_vec[id] * hmm.A[id, 1]
         alpha_vec[0] = temp0 * cond_prob(Y[i], "0", zeta, epsilon, m, K, alpha)
         alpha_vec[1] = temp1 * cond_prob(Y[i], "1", zeta, epsilon, m, K, alpha)
-        cs[i] = np.sum(alpha_vec)
-        alpha_vec /= cs[i]
+        if counter >= 0:
+            cs[i] = np.sum(alpha_vec)
+            alpha_vec /= cs[i]
+            counter = 0
+        else:
+            cs[i] = 1
+            counter += 1
         entropies[i] = sequence_entropy(lambda_other)
 
     lambda_n = np.log(alpha_vec[0]/alpha_vec[1])
     print(f"Entropy alpha method: {sequence_entropy(lambda_n)}")
     print(f"Entropy Liva method: {sequence_entropy(lambda_other)}")
-    print(f"P(Y^n): {1/np.prod(cs)}")
+    print(f"P(Y^n): {np.exp(-np.sum(np.log(cs)))}")
 
     plt.figure()
     source_entropy = - hmm.pi[0] * np.log2(hmm.pi[0]) - hmm.pi[1] * np.log2(hmm.pi[1])
