@@ -8,7 +8,7 @@ def lam(d:int, alpha:float=0.02, R:float=10, bypass=False):
     return 1 / (1 + d * R)**alpha
 
 @jit   
-def cond_prob(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
+def cond_prob_y_given_x(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
     """
     Compute the conditional probability of Y=y|X=x
     """
@@ -31,6 +31,11 @@ def cond_prob(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
     if y == 3:
         return pi
     raise NotImplementedError
+
+@jit
+def cond_prob_x_given_seq_y(y, x, pi, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
+    len_sum = len(pi)
+    num = cond_prob_y_given_x()
 
 @jit
 def sequence_entropy(lam:float):

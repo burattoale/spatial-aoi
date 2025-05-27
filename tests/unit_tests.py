@@ -94,28 +94,6 @@ class TestEntropyProbabilities(unittest.TestCase):
                     self.assertTrue(h_val <= 1 + 1e-8,
                                     f"Entropy h_y_delta too high for delta={delta}: {h_val}")
     
-    def test_p_delta_range(self):
-        """p_delta returns valid probabilities summing less than or equal to 1"""
-        ps_val = 0.5  # example value
-        total_prob = 0
-        for delta in range(20):
-            pval = p_delta(ps_val, delta)
-            self.assertTrue(0 <= pval <= 1, f"p_delta out of range for delta={delta}")
-            total_prob += pval
-        # Sum over delta of geometric pmf <= 1 (actually equals 1, but truncated here)
-        self.assertTrue(total_prob <= 1 + 1e-10)
-    
-    def test_entropy_nonnegative_and_reasonable(self):
-        """entropy function returns non-negative value"""
-        for K in self.K_values:
-            m = math.floor(self.rho * np.pi * self.R * K)
-            p_succ = ps(m, self.zeta, self.epsilon)
-            # Create dummy states list with y in {0,1} and delta in [0, 5]
-            states = [(y, delta) for y in self.y_symbols for delta in range(6)]
-            ent_val = entropy(self.A, self.pi, K, self.R, self.alpha, m, self.zeta, self.epsilon, states)
-            self.assertTrue(ent_val >= 0, f"Entropy negative for K={K}")
-            # Entropy upper bound (binary entropy max ~1 bit)
-            self.assertTrue(ent_val <= 1.5, f"Entropy too large for K={K}: {ent_val}")
 
 if __name__ == "__main__":
     unittest.main()

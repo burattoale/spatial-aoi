@@ -2,7 +2,7 @@ import numpy as np
 
 from utils import SimulationParameters
 from utils import _compute_steady_state
-from utils import lam
+from utils import cond_prob_y_given_x
 
 class DTMC(object):
     def __init__(self, q, eta, seed=None):
@@ -78,41 +78,14 @@ class HiddenMM(object):
         B = np.zeros(shape, dtype=float)
         for i in range(shape[0]):
             for j in range(shape[1]):
-                B[i, j] = self.cond_prob(self._params.Y_symbols[j], self._params.X_symbols[i])
+                B[i, j] = cond_prob_y_given_x(self._params.Y_symbols[j], 
+                                              self._params.X_symbols[i], 
+                                              self._params.zeta, 
+                                              self._params.epsilon,
+                                              self._params.m,
+                                              self._params.K,
+                                              self._params.alpha,
+                                              self._params.R)
 
         return B
     
-    def cond_prob(self, y:int, x:int):
-        """
-        Compute the conditional probability of Y=y|X=x.
-
-        .. versionchanged:: 1.5
-        All parameters are in params to make the initialization of the HMM.
-        """
-        # Read useful parameters
-        m = self._params.m
-        zeta = self._params.zeta
-        epsilon = self._params.epsilon
-        alpha = self._params.alpha
-        R = self._params.R
-        K = self._params.K
-
-        ps = m * zeta * (1 - epsilon) * (1 - zeta * (1 - epsilon))**(m-1)
-        pi = (1 - zeta * (1 - epsilon))**m
-        if y == 0 or y == 1:
-            if x == y:
-                total = 0
-                for d in range(K):
-                    total += lam(d, alpha, R) * (2*d + 1) / K**2
-                total *= ps
-            else:
-                total = 0
-                for d in range(K):
-                    total += (1-lam(d, alpha, R)) * (2*d + 1) / K**2
-                total *= ps
-            return total
-        if y == 2:
-            return 1 - ps - pi
-        if y == 3:
-            return pi
-        raise NotImplementedError

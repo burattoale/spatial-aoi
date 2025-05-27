@@ -169,7 +169,7 @@ if __name__ == "__main__":
         m_override=None,
         K=5, # Initial K for the first plot
         alpha=0.02,
-        beta=2, # Default beta, will be overridden in the loop
+        beta=0.02, # Default beta, will be overridden in the loop
         R_unit=10
     )
 
@@ -239,11 +239,11 @@ if __name__ == "__main__":
     beta_values_to_test = [0, 0.02,0.03,0.04]#, 4.0, 5, 6]  # Example Beta values
 
     K_start_plot = 1
-    K_end_plot = 30 # Kept from previous
+    K_end_plot = 15
     K_values_for_plot = list(range(K_start_plot, K_end_plot + 1))
     
     simulation_K_interval = 1 
-    num_mc_repetitions = 3 # Reduced for faster example with multiple betas
+    num_mc_repetitions = 20 # Reduced for faster example with multiple betas
     n_parallel_jobs = -1      
 
     num_simulation_runs_sweep = 1000 # Reduced for faster example
@@ -362,15 +362,15 @@ if __name__ == "__main__":
         color = beta_colors[i]
 
         # Plot Theoretical Line for this Beta (optional, can make plot busy)
-        # if beta_data["K_points"] and beta_data["theo_H"]:
-        #     plt.plot(beta_data["K_points"], beta_data["theo_H"],
-        #              label=fr'Theoretical $H (\beta={beta_val_plot:.1f})$',
-        #              marker='.', linestyle='--', color=color, alpha=0.7)
+        if beta_data["K_points"] and beta_data["theo_H"]:
+            plt.semilogy(beta_data["K_points"], beta_data["theo_H"],
+                     label=fr'Theoretical $H (\beta={beta_val_plot:.2f})$',
+                     marker='.', linestyle='--', color=color, alpha=0.7)
         
         # Plot Averaged Simulated Entropies for this Beta
         if beta_data.get("sim_K_points") and beta_data.get("sim_H"): # Use .get for safety
-            plt.plot(beta_data["sim_K_points"], beta_data["sim_H"], 
-                     label=fr'Avg. Simulated $H (MC, \beta={beta_val_plot:.1f})$', 
+            plt.semilogy(beta_data["sim_K_points"], beta_data["sim_H"], 
+                     label=fr'Avg. Simulated $H (MC, \beta={beta_val_plot:.2f})$', 
                      linestyle='-', marker='o', markersize=6, color=color)
 
     plt.axhline(y=h_x_source, color='r', linestyle=':', label=f'$H(X)$ = {h_x_source:.4f}')
