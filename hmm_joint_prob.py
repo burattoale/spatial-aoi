@@ -2,19 +2,55 @@ import numpy as np
 from matplotlib import pyplot as plt
 import math
 import sys
+from tqdm import tqdm
 
 from environment import HiddenMM
 from utils import SimulationParameters
 from utils import cond_prob_y_given_x, sequence_entropy
+
+def hmm_entropy(params:SimulationParameters, simulation_length:int=10000):
+    hmm = HiddenMM(params)
+    Y = np.empty(simulation_length, dtype=object) # observations
+    alpha_vec = np.empty(2) # forward variables
+    cs = np.zeros(simulation_length) # scaling coefficients
+    entropies = np.zeros(simulation_length)
+
+    print(f"Starting simulation with {simulation_length} steps")
+    print(f"Number of sensors: {params.m}")
+    # initialize the first values of the simulation
+    Y[0] = hmm.state
+    cond_prob0 = hmm.B[0, Y[0]]
+    cond_prob1 = hmm.B[1, Y[0]]
+    alpha_vec[0] = hmm.pi[0] * cond_prob0
+    alpha_vec[1] = hmm.pi[1] * cond_prob1
+    cs[0] = 1
+
+    for i in tqdm(range(1, simulation_length)):
+        Y[i] = hmm.step()
+
+        temp0, temp1 = 0, 0
+        for id in range(2): # only two states
+            temp0 += alpha_vec[id] * hmm.A[id, 0]
+            temp1 += alpha_vec[id] * hmm.A[id, 1]
+        alpha_vec[0] = temp0 * cond_prob_y_given_x(Y[i], 0, params.zeta, params.epsilon, params.m, params.K, params.alpha)
+        alpha_vec[1] = temp1 * cond_prob_y_given_x(Y[i], 1, params.zeta, params.epsilon, params.m, params.K, params.alpha)
+        cs[i] = np.sum(alpha_vec)
+        alpha_vec /= cs[i] # normalize the forward probabilities
+
+        p_0_y_norm = alpha_vec[0] / np.sum(alpha_vec)
+        p_1_y_norm = alpha_vec[1] / np.sum(alpha_vec)
+        entropies[i] = - p_0_y_norm * np.log2(p_0_y_norm+1e-12) - p_1_y_norm * np.log2(p_1_y_norm+1e-12)
+
+    return entropies, np.mean(entropies)
 
 
 if __name__ == "__main__":
     sim_length = 500
     # sim parameters
     q = 0.1
-    eta = 1
+    eta = 5
     zeta = 0.002
-    epsilon = 0
+    epsilon = 0.1
     rho = 5e-2
     R = 10
     K = 5
