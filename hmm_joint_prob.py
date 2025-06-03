@@ -18,7 +18,7 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000):
     print(f"Starting simulation with {simulation_length} steps")
     print(f"Number of sensors: {params.m}")
     # initialize the first values of the simulation
-    Y[0] = hmm.state
+    Y[0] = hmm.hidden_state
     cond_prob0 = hmm.B[0, Y[0]]
     cond_prob1 = hmm.B[1, Y[0]]
     alpha_vec[0] = hmm.pi[0] * cond_prob0
@@ -45,13 +45,13 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000):
 
 
 if __name__ == "__main__":
-    sim_length = 500
+    sim_length = 10000
     # sim parameters
-    q = 0.1
-    eta = 5
-    zeta = 0.002
+    q = 0.005
+    eta = 1
+    zeta = 0.0001
     epsilon = 0.1
-    rho = 5e-2
+    rho = 5e-3
     R = 10
     K = 5
     m = math.floor(rho * np.pi * R**2*K)
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     rng = np.random.default_rng()
 
     Y = np.empty(sim_length, dtype=object)
-    Y[0] = hmm.state
+    Y[0] = hmm._hidden_state
 
     cond_prob0 = hmm.B[0, Y[0]]
     cond_prob1 = hmm.B[1, Y[0]]

@@ -25,9 +25,11 @@ def run_monte_carlo_simulation(params: SimulationParameters,
     dtmc = DTMC(q=params.q, eta=params.eta, seed=int(dtmc_seed))
 
     # 2. Initialize Node Distribution
+    print(params.beta)
     node_dist = NodeDistribution(rho=params.rho,
                                  unit_radius=params.R_unit,
                                  K=params.K,
+                                 zeta = params.zeta,
                                  alpha=params.alpha,
                                  beta=params.beta,
                                  seed=int(node_dist_seed))
@@ -71,6 +73,7 @@ def run_monte_carlo_simulation(params: SimulationParameters,
             actual_node_obj = node_dist.nodes[node_idx % len(node_dist.nodes)] 
 
             prob_node_attempts_and_succeeds_tx = actual_node_obj.zeta * (1 - params.epsilon)
+            #  print(actual_node_obj.zeta)
 
             # Node perceives the source state (possibly incorrectly)
             if rng.random() < actual_node_obj.lam: # lam is P(correct perception)

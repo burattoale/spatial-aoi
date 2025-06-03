@@ -33,11 +33,6 @@ def cond_prob_y_given_x(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:f
     raise NotImplementedError
 
 @jit
-def cond_prob_x_given_seq_y(y, x, pi, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
-    len_sum = len(pi)
-    num = cond_prob_y_given_x()
-
-@jit
 def sequence_entropy(lam:float):
     out = 0
     for x in [0, 1]:
