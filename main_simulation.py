@@ -51,7 +51,7 @@ def run_monte_carlo_simulation(params: SimulationParameters,
     print(f"Simulation started with {num_nodes} nodes.")
 
     # 3. Initialize Receiver State
-    last_received_y = int(rng.choice(params.Y_symbols)) # Initial guess
+    last_received_y = 0# int(rng.choice(params.Y_symbols)) # Initial guess
     current_aoi = 0  # Age of Information, start fresh
 
     # Data collectors

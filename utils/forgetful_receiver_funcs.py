@@ -56,22 +56,20 @@ def prob_x_given_y_0(x:int, y:int, pi:np.ndarray, K:int, R_unit:float, alpha:flo
     return p_y_given_x_0_val * pi[x] / p_y_0
 
 @jit
-def prob_x_given_y_delta(p_x_given_y_0_vec:np.ndarray, A:np.ndarray, delta:int):
+def prob_x_given_y_delta(p_x_given_y_0_vec:np.ndarray, A_delta_power:np.ndarray):
     # p_x_given_y_0_vec is a row vector [P(X_0=0|Y_0), P(X_0=1|Y_0)]
     # We want P(X_delta | Y_0) = P(X_0 | Y_0) @ A^delta
     # Result is a row vector [P(X_delta=0|Y_0), P(X_delta=1|Y_0)]
-    if delta == 0:
-        return p_x_given_y_0_vec
     # Ensure p_x_given_y_0_vec is a 1D array for consistent matrix multiplication result
-    return np.dot(p_x_given_y_0_vec.flatten(), np.linalg.matrix_power(A, delta))
+    return np.dot(p_x_given_y_0_vec.flatten(), A_delta_power)
 
 @jit
-def h_y_delta(p_x_given_y_0_vec:np.ndarray, A:np.ndarray, delta:int, x_symbols=None):
+def h_y_delta(p_x_given_y_0_vec:np.ndarray, A_delta_power:np.ndarray, x_symbols=None):
     # Calculates H(X_delta | Y_0)
     if x_symbols is None:
         x_symbols = np.array([0, 1]) # Assuming binary source
     
-    p_x_delta_given_y_0 = prob_x_given_y_delta(p_x_given_y_0_vec, A, delta)
+    p_x_delta_given_y_0 = prob_x_given_y_delta(p_x_given_y_0_vec, A_delta_power)
     
     out = 0
     for i in range(len(x_symbols)): # Iterate over possible states of X_delta
@@ -147,6 +145,9 @@ def overall_entropy(A:np.ndarray, pi:np.ndarray, K:int, R_unit:float, alpha:floa
         # If ps_calc = 1, p_delta is 1 for delta=0, and 0 for delta > 0.
 
     y_symbols = [0, 1] # Assuming binary received messages
+    matrix_power_cache = {}
+    matrix_power_cache[0] = np.eye(A.shape[0])
+    matrix_power_cache[1] = A.copy()
 
     for y_val in y_symbols:
         # P(X_0 | Y_0=y_val)
@@ -160,7 +161,10 @@ def overall_entropy(A:np.ndarray, pi:np.ndarray, K:int, R_unit:float, alpha:floa
 
         for delta_val in range(max_delta_considered + 1): # Sum over a practical range of delta
             # Conditional entropy H(X_delta | Y_0=y_val)
-            h_val = h_y_delta(p_x_g_y0_vec, A, delta_val)
+            if delta_val not in matrix_power_cache:
+                matrix_power_cache[delta_val] = np.linalg.matrix_power(A, delta_val)
+            A_delta_power = matrix_power_cache[delta_val]
+            h_val = h_y_delta(p_x_g_y0_vec, A_delta_power)
             
             # Probability of this (y_val, delta_val) situation occurring
             # P(Delta = delta_val)

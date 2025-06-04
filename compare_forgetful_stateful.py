@@ -12,10 +12,10 @@ from environment import DTMC, NodeDistribution
 
 def do_simulation_pair(params:SimulationParameters, sim_length:int):
     params.beta = 0
-    params.Y_symbols = [0,1,2,3]
     time_evolution, mean_e_hmm = hmm_entropy(params, sim_length)
 
-    params.Y_symbols = [0,1]
+    time_evolution_loc_aware, mean_e_hmm_loc_aware = hmm_entropy(params, sim_length, loc_aware=True) 
+
     mean_e_forgetful, time_evolution_forgetful = run_monte_carlo_simulation(
         params=params,
         num_time_steps=sim_length,
@@ -26,13 +26,14 @@ def do_simulation_pair(params:SimulationParameters, sim_length:int):
     # plt.plot(time_evolution, label="HMM")
     # plt.legend()
     # plt.show()
-    del time_evolution, time_evolution_forgetful
+    del time_evolution, time_evolution_forgetful, time_evolution_loc_aware
 
-    return mean_e_forgetful, mean_e_hmm
+    return mean_e_forgetful, mean_e_hmm, mean_e_hmm_loc_aware
 
-def parallel_k(k, params, sim_length, n_topologies, parallel_jobs):
+def parallel_k(k:int, params:SimulationParameters, sim_length:int, n_topologies:int, parallel_jobs:int):
     params.K = k
     params.m = math.floor(rho * np.pi * (params.R_unit*k)**2)
+    params.Y_symbols = [i for i in range(len(params.X_symbols) * k + 2)]
     results = Parallel(n_jobs=math.ceil(n_topologies/parallel_jobs), backend="loky", verbose=1)(
         delayed(do_simulation_pair)(params, sim_length) for _ in range(n_topologies)
     )
@@ -42,12 +43,12 @@ def parallel_k(k, params, sim_length, n_topologies, parallel_jobs):
 
 if __name__ == "__main__":
     sim_length = 10000
-    n_topologies = 25
-    parallel_jobs = 5 # how many k to do symultaneously
-    k_max = 81
+    n_topologies = 1
+    parallel_jobs = 1 # how many k to do symultaneously
+    k_max = 31
 
     q = 0.005
-    eta = 5
+    eta = 1
     zeta = 0.0001
     epsilon = 0.1
     rho = 5e-2
@@ -95,15 +96,18 @@ if __name__ == "__main__":
     res = np.array(res)
     entropies_k_forgetful = res[:,0]
     entropies_k_hmm = res[:,1]
+    entropies_k_hmm_loc_aware = res[:,2]
 
     plt.figure()
     plt.plot(np.arange(1,k_max)*R, entropies_k_forgetful, marker='.', label="Forgetful receiver")
     plt.plot(np.arange(1,k_max)*R, entropies_k_hmm, marker='.', label="HMM receiver")
+    plt.plot(np.arange(1,k_max)*R, entropies_k_hmm,linestyle=":", marker='.', label="HMM receiver loc aware")
     plt.xlabel("radius R [m]")
     plt.ylabel("average estimation entropy")
     plt.legend()
     plt.grid(True)
-    plt.savefig(f"plots/comparison_eta_{eta}.png", bbox_inches="tight", pad_inches=0)
+    plt.show()
+    # plt.savefig(f"plots/comparison_eta_{eta}.png", bbox_inches="tight", pad_inches=0)
 
     results = {
         "K": k_max-1,
@@ -111,5 +115,5 @@ if __name__ == "__main__":
         "hmm_receiver": entropies_k_hmm
     }
 
-    with open(f"results/comparison_entropies_eta_{eta}.pkl", 'wb') as file:
-        pickle.dump(results, file, protocol=pickle.HIGHEST_PROTOCOL)
+    # with open(f"results/comparison_entropies_eta_{eta}.pkl", 'wb') as file:
+    #     pickle.dump(results, file, protocol=pickle.HIGHEST_PROTOCOL)
