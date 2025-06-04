@@ -25,7 +25,6 @@ def run_monte_carlo_simulation(params: SimulationParameters,
     dtmc = DTMC(q=params.q, eta=params.eta, seed=int(dtmc_seed))
 
     # 2. Initialize Node Distribution
-    print(params.beta)
     node_dist = NodeDistribution(rho=params.rho,
                                  unit_radius=params.R_unit,
                                  K=params.K,
@@ -56,9 +55,19 @@ def run_monte_carlo_simulation(params: SimulationParameters,
     current_aoi = 0  # Age of Information, start fresh
 
     # Data collectors
-    entropy_evolution = [] # To store H(X_t | Y_n, Delta_n) at each step after burn-in
+    entropy_evolution = np.empty(num_time_steps, dtype=float) # To store H(X_t | Y_n, Delta_n) at each step after burn-in
     total_entropy_contribution = 0.0
     num_valid_steps_for_avg = 0
+
+    # extract features from nodes
+    nodes_lam = np.array([node.lam for node in node_dist.nodes])
+    nodes_zeta = np.array([node.zeta for node in node_dist.nodes])
+    prob_nodes_attempts_and_succeed_tx = nodes_zeta * (1 - params.epsilon)
+
+    # cache for transition matrix elevated to the AoI power
+    matrix_power_cache = {}
+    matrix_power_cache[0] = np.eye(dtmc.A.shape[0])
+    matrix_power_cache[1] = dtmc.A.copy()
 
     # Simulation loop (Burn-in + Collection)
     for t in range(num_burn_in_steps + num_time_steps):
@@ -66,32 +75,27 @@ def run_monte_carlo_simulation(params: SimulationParameters,
         current_x_source_state = dtmc.step()
 
         # B. Node Observation and Transmission
-        successful_observations = []
+        rand_perception = rng.random(num_nodes)
+        rand_tx = rng.random(num_nodes)
+        perc_correct = current_x_source_state
+        perc_not_correct = 1 - current_x_source_state
 
-        for node_idx in range(num_nodes):
-            # Ensure we don't go out of bounds if m_override > actual len(node_dist.nodes)
-            actual_node_obj = node_dist.nodes[node_idx % len(node_dist.nodes)] 
+        nodes_perception = np.where(
+            rand_perception < nodes_lam,
+            perc_correct,
+            perc_not_correct
+        )
 
-            prob_node_attempts_and_succeeds_tx = actual_node_obj.zeta * (1 - params.epsilon)
-            #  print(actual_node_obj.zeta)
+        tx_mask = rand_tx < prob_nodes_attempts_and_succeed_tx
+        tx_idx = np.nonzero(tx_mask)[0]
+        num_succ_tx = len(tx_idx)
 
-            # Node perceives the source state (possibly incorrectly)
-            if rng.random() < actual_node_obj.lam: # lam is P(correct perception)
-                node_perceived_x = current_x_source_state
-            else:
-                node_perceived_x = 1 - current_x_source_state # Binary assumption
-
-            # Node attempts to transmit; transmission can be erased
-            if rng.random() < prob_node_attempts_and_succeeds_tx:
-                successful_observations.append(node_perceived_x)
-
-        # C. Receiver Update
-        # Condition: if EXACTLY ONE node successfully transmitted (as per user's modified code)
-        if len(successful_observations) == 1:
-            current_y = successful_observations[0] # The only observation is the received one
+        if num_succ_tx == 1:
+            successful_node = tx_idx[0]
+            current_y = nodes_perception[successful_node]
             last_received_y = current_y
             current_aoi = 0
-        else: # No successful transmission OR multiple successful transmissions (treated as no update based on "==1" condition)
+        else:
             current_aoi += 1
 
         # D. Entropy Contribution (after burn-in)
@@ -105,14 +109,17 @@ def run_monte_carlo_simulation(params: SimulationParameters,
                 for x_val in params.X_symbols
             ])
 
+            if current_aoi not in matrix_power_cache:
+                matrix_power_cache[current_aoi] = np.linalg.matrix_power(dtmc.A, current_aoi)
+            A_aoi_pow = matrix_power_cache[current_aoi]
+
             # H(X_t | Y_n, Delta_n)
             # = H(X_{t_reception + Delta_n} | Y_n_at_t_reception = last_received_y)
             h_contrib = h_y_delta(p_x_given_y0_at_reception_vec,
-                                  dtmc.A,
-                                  current_aoi,
+                                  A_aoi_pow,
                                   x_symbols=np.array(params.X_symbols))
             
-            entropy_evolution.append(h_contrib)
+            entropy_evolution[t-num_burn_in_steps] = h_contrib
             total_entropy_contribution += h_contrib
             num_valid_steps_for_avg += 1
 
@@ -166,7 +173,7 @@ if __name__ == "__main__":
     initial_params = SimulationParameters(
         q=0.005,
         eta=1,
-        zeta=1e-4, # Example: list of base probabilities. NodeDistribution will use this.
+        zeta=1e-2, # Example: list of base probabilities. NodeDistribution will use this.
         epsilon=0.1,
         rho=0.005,
         m_override=None,
@@ -186,6 +193,7 @@ if __name__ == "__main__":
     # For the first plot, we need NodeDistribution for the initial params to get tx_probs for sim
     _node_dist_initial = NodeDistribution(
         rho=initial_params.rho, unit_radius=initial_params.R_unit, K=initial_params.K,
+        zeta=initial_params.zeta,
         alpha=initial_params.alpha, beta=initial_params.beta
     )
     m_calc_initial = len(_node_dist_initial)
@@ -216,7 +224,7 @@ if __name__ == "__main__":
     else:
         theoretical_entropy_initial = h_x_source
 
-    if entropy_time_series_initial:
+    if list(entropy_time_series_initial):
         plt.figure(figsize=(12, 6))
         plt.plot(np.arange(len(entropy_time_series_initial)), entropy_time_series_initial, label=r'Instantaneous $H(X_t | Y_n, \Delta_n)$', alpha=0.7)
         plt.axhline(y=h_x_source, color='r', linestyle='--', label='$H(X)$')
@@ -227,7 +235,7 @@ if __name__ == "__main__":
         plt.ylabel("Entropy (bits)")
         plt.title(rf"Evolution of Conditional Entropy (K={initial_params.K}, $\beta$={initial_params.beta})")
         plt.legend(); plt.grid(True); plt.ylim(bottom=0)
-        if entropy_time_series_initial:
+        if list(entropy_time_series_initial):
             max_plot_y = h_x_source * 1.1
             if avg_entropy_mc_initial is not None: max_plot_y = max(max_plot_y, avg_entropy_mc_initial * 1.1)
             if theoretical_entropy_initial is not None and m_calc_initial > 0: max_plot_y = max(max_plot_y, theoretical_entropy_initial * 1.1)
@@ -272,7 +280,8 @@ if __name__ == "__main__":
         for k_val_theoretical in tqdm(K_values_for_plot, desc=f"Theoretical K-sweep (Beta={beta_val})"):
             _node_dist_k_theo = NodeDistribution(
                 rho=current_beta_params.rho, unit_radius=current_beta_params.R_unit, 
-                K=k_val_theoretical, alpha=current_beta_params.alpha,
+                K=k_val_theoretical,
+                zeta=current_beta_params.zeta, alpha=current_beta_params.alpha,
                 beta=current_beta_params.beta, # Current beta
             )
             m_calc_k_theo = len(_node_dist_k_theo)

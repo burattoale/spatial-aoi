@@ -3,6 +3,7 @@ import numpy as np
 from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import pickle
 
 from hmm_sim import hmm_entropy
 from main_simulation import run_monte_carlo_simulation
@@ -27,16 +28,26 @@ def do_simulation_pair(params:SimulationParameters, sim_length:int):
     # plt.show()
     del time_evolution, time_evolution_forgetful
 
-
     return mean_e_forgetful, mean_e_hmm
+
+def parallel_k(k, params, sim_length, n_topologies, parallel_jobs):
+    params.K = k
+    params.m = math.floor(rho * np.pi * (params.R_unit*k)**2)
+    results = Parallel(n_jobs=math.ceil(n_topologies/parallel_jobs), backend="loky", verbose=1)(
+        delayed(do_simulation_pair)(params, sim_length) for _ in range(n_topologies)
+    )
+    # average the results from the run
+    averages = np.mean(results, axis=0)
+    return averages
 
 if __name__ == "__main__":
     sim_length = 10000
-    n_topologies = 20
-    k_max = 60
+    n_topologies = 25
+    parallel_jobs = 5 # how many k to do symultaneously
+    k_max = 81
 
     q = 0.005
-    eta = 1
+    eta = 5
     zeta = 0.0001
     epsilon = 0.1
     rho = 5e-2
@@ -57,16 +68,19 @@ if __name__ == "__main__":
 
     entropies_k_forgetful = []
     entropies_k_hmm = []
-    for k in tqdm(range(1,k_max), desc="Working over Ks"):
-        params.K = k
-        params.m = math.floor(rho * np.pi * (params.R_unit*k)**2)
-        results = Parallel(n_jobs=-1, backend="loky", verbose=1)(
-            delayed(do_simulation_pair)(params, sim_length) for _ in range(n_topologies)
-        )
-        # average the results from the run
-        averages = np.mean(results, axis=0)
-        entropies_k_forgetful.append(averages[0])
-        entropies_k_hmm.append(averages[1])
+    res = Parallel(n_jobs=parallel_jobs, backend="loky", verbose=1)(
+        delayed(parallel_k)(k, params, sim_length, n_topologies, parallel_jobs) for k in range(1, k_max)
+    )
+    # for k in tqdm(range(1,k_max), desc="Working over Ks"):
+    #     params.K = k
+    #     params.m = math.floor(rho * np.pi * (params.R_unit*k)**2)
+    #     results = Parallel(n_jobs=math.floor(n_topologies/parallel_jobs), backend="loky", verbose=1)(
+    #         delayed(do_simulation_pair)(params, sim_length) for _ in range(n_topologies)
+    #     )
+    #     # average the results from the run
+    #     averages = np.mean(results, axis=0)
+    #     entropies_k_forgetful.append(averages[0])
+    #     entropies_k_hmm.append(averages[1])
 
         # for the forgetful receiver create DTMC and tx probability vector
         # mm = DTMC(params.q, params.eta)
@@ -78,12 +92,24 @@ if __name__ == "__main__":
 
         # entropies_k_forgetful.append(mean_e_forgetful)
         # entropies_k_hmm.append(np.mean(results))
+    res = np.array(res)
+    entropies_k_forgetful = res[:,0]
+    entropies_k_hmm = res[:,1]
 
     plt.figure()
-    plt.plot(np.arange(1,k_max), entropies_k_forgetful, marker='.', label="Forgetful receiver")
-    plt.plot(np.arange(1,k_max), entropies_k_hmm, marker='.', label="HMM receiver")
-    plt.xlabel("K")
+    plt.plot(np.arange(1,k_max)*R, entropies_k_forgetful, marker='.', label="Forgetful receiver")
+    plt.plot(np.arange(1,k_max)*R, entropies_k_hmm, marker='.', label="HMM receiver")
+    plt.xlabel("radius R [m]")
     plt.ylabel("average estimation entropy")
     plt.legend()
     plt.grid(True)
-    plt.show()
+    plt.savefig(f"plots/comparison_eta_{eta}.png", bbox_inches="tight", pad_inches=0)
+
+    results = {
+        "K": k_max-1,
+        "forgetful_receiver": entropies_k_forgetful,
+        "hmm_receiver": entropies_k_hmm
+    }
+
+    with open(f"results/comparison_entropies_eta_{eta}.pkl", 'wb') as file:
+        pickle.dump(results, file, protocol=pickle.HIGHEST_PROTOCOL)
