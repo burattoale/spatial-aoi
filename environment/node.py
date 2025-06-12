@@ -43,6 +43,10 @@ class Node(object):
     @property
     def zeta(self):
         return self.tx_probability
+    
+    @property
+    def zone_idx(self):
+        return self.d_idx
 
     def _compute_distance(self) -> float:
         """

@@ -42,15 +42,9 @@ def cond_prob_y_given_x_spatial(y, x, zeta, epsilon, m:int, K:int, alpha:float=0
     valued_symbol = y // K
     if valued_symbol == 0 or valued_symbol == 1:
         if x == valued_symbol:
-            total = 0
-            for d in range(K):
-                total += lam(d, alpha, R) * (2*d + 1) / K**2
-            total *= ps * (2*(y%K) + 1) / K**2
+            total = ps * (2*(y%K) + 1) / K**2 * lam(y%K, alpha, R)
         else:
-            total = 0
-            for d in range(K):
-                total += (1-lam(d, alpha, R)) * (2*d + 1) / K**2
-            total *= ps * (2*(y%K) + 1) / K**2
+            total = ps * (2*(y%K) + 1) / K**2 * (1-lam(y%K, alpha, R))
         return total
     if valued_symbol == 2 and y % K == 0:
         return 1 - ps - pi

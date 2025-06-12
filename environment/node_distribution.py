@@ -71,6 +71,9 @@ class NodeDistribution(object):
 
     def __len__(self):
         return self.m
+    
+    def __getitem__(self, index):
+        return self._nodes[index]
 
     def _sample_circle(self, coordinates: str = "radial") -> Tuple[float, float]:
         """

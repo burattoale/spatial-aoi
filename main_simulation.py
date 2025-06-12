@@ -173,9 +173,9 @@ if __name__ == "__main__":
     initial_params = SimulationParameters(
         q=0.005,
         eta=1,
-        zeta=1e-2, # Example: list of base probabilities. NodeDistribution will use this.
+        zeta=5e-4, # Example: list of base probabilities. NodeDistribution will use this.
         epsilon=0.1,
-        rho=0.005,
+        rho=0.05,
         m_override=None,
         K=5, # Initial K for the first plot
         alpha=0.02,
@@ -247,18 +247,18 @@ if __name__ == "__main__":
     # --- K-sweep plot, now also iterating over BETA values ---
     print("\nGenerating plot for Entropy vs. K for different Beta values (with parallel simulations)...")
 
-    beta_values_to_test = [0, 0.02,0.03,0.04]#, 4.0, 5, 6]  # Example Beta values
+    beta_values_to_test = [0, 0.05, 0.1, 0.2]#, 4.0, 5, 6]  # Example Beta values
 
     K_start_plot = 1
-    K_end_plot = 15
+    K_end_plot = 30
     K_values_for_plot = list(range(K_start_plot, K_end_plot + 1))
     
     simulation_K_interval = 1 
     num_mc_repetitions = 20 # Reduced for faster example with multiple betas
     n_parallel_jobs = -1      
 
-    num_simulation_runs_sweep = 1000 # Reduced for faster example
-    num_burn_in_sweep = 100          # Reduced for faster example
+    num_simulation_runs_sweep = 10000 # Reduced for faster example
+    num_burn_in_sweep = 1000          # Reduced for faster example
 
     # Store results per beta: {beta_val: {"K_points": [], "sim_H": [], "theo_H": []}}
     results_by_beta = defaultdict(lambda: {"K_points": [], "sim_H": [], "theo_H": []})
@@ -378,6 +378,7 @@ if __name__ == "__main__":
             plt.semilogy(beta_data["K_points"], beta_data["theo_H"],
                      label=fr'Theoretical $H (\beta={beta_val_plot:.2f})$',
                      marker='.', linestyle='--', color=color, alpha=0.7)
+            print(f"beta:{beta_val_plot}, min attained at: {np.argmin(beta_data['theo_H'])}, with value: {np.min(beta_data['theo_H'])}")
         
         # Plot Averaged Simulated Entropies for this Beta
         if beta_data.get("sim_K_points") and beta_data.get("sim_H"): # Use .get for safety

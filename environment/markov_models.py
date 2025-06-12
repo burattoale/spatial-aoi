@@ -34,9 +34,9 @@ class HiddenMM(object):
     Contains the matrices and parameters of a Hidden Markov Model
     """
 
-    def __init__(self, params:SimulationParameters):
+    def __init__(self, params:SimulationParameters, seed=None):
         self._params = params
-        self.rng = np.random.default_rng()
+        self.rng = np.random.default_rng(seed)
         self._A = np.array([[1 - self._params.q, self._params.q],
                             [self._params.eta * self._params.q, 1 - self._params.eta * self._params.q]])
         self._steady_state = _compute_steady_state(self._A)
@@ -91,9 +91,9 @@ class HiddenMM(object):
     
 
 class SpatialHMM(HiddenMM):
-    def __init__(self, params):
+    def __init__(self, params, seed=None):
         self._params = params
-        self.rng = np.random.default_rng()
+        self.rng = np.random.default_rng(seed)
         self._A = np.array([[1 - self._params.q, self._params.q],
                             [self._params.eta * self._params.q, 1 - self._params.eta * self._params.q]])
         self._steady_state = _compute_steady_state(self._A)
