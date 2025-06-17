@@ -102,7 +102,6 @@ class SpatialHMM(HiddenMM):
         # the current visible state is drawn from the row of the emission matrix
         self._hidden_state = self.rng.choice(self._params.X_symbols, p=self._steady_state)
         self._emission_matrix = self._fill_emission_matrix()
-        print(np.sum(self._emission_matrix, axis=1))
         self._emission_state = self.rng.choice(self._params.Y_symbols, p=self._emission_matrix[int(self._hidden_state)])
 
     def _fill_emission_matrix(self):
