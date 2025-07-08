@@ -18,7 +18,7 @@ class NodeDistribution(object):
     given the density.
     """
 
-    def __init__(self, rho: float, unit_radius: float, K: int, zeta:float, alpha:float, beta:float, seed: int = None): # Added alpha
+    def __init__(self, rho: float, unit_radius: float, K: int, zeta:float|np.ndarray, alpha:float, beta:float, seed: int = None, zeta_bucket:bool=False): # Added alpha
         """
         :param rho: The density of the nodes in the circle.
         :type rho: float
@@ -57,8 +57,22 @@ class NodeDistribution(object):
         
         sampled_points = [self._sample_circle() for _ in range(self.m)]
         # Pass alpha to Node constructor
-        self._nodes = [Node(point, self.unit_radius, buckets, zeta=zeta, alpha=alpha, beta=beta) for point in sampled_points]
-        self._tx_probabilities = [n.zeta for n in self.nodes]
+        if isinstance(zeta, float):
+            self._nodes = [Node(point, self.unit_radius, buckets, zeta=zeta, alpha=alpha, beta=beta) for point in sampled_points]
+            self._tx_probabilities = [n.zeta for n in self.nodes]
+            self._tx_prob_bucket = np.array([zeta] * K)
+        elif isinstance(zeta, np.ndarray) and not zeta_bucket:
+            self._nodes = [Node(point, self.unit_radius, buckets, zeta=z, alpha=alpha, beta=beta) for z, point in zip(zeta,sampled_points)]
+            self._tx_probabilities = zeta.tolist()
+            self._tx_prob_bucket = np.array([zeta] * K)
+        elif isinstance(zeta, np.ndarray) and zeta_bucket:
+            self._nodes = [Node(point, self.unit_radius, buckets, zeta=zeta, alpha=alpha, beta=beta) for point in sampled_points]
+            for n in self._nodes:
+                n.tx_probability = zeta[n.zone_idx]
+            self._tx_probabilities = [n.zeta for n in self.nodes]
+            self._tx_prob_bucket = zeta
+        else:
+            raise NotImplementedError("The combination of parameter is not allowed by the current implementation")
 
 
     @property
@@ -68,6 +82,10 @@ class NodeDistribution(object):
     @property
     def tx_probabilities(self):
         return self._tx_probabilities
+    
+    @property
+    def tx_prob_bucket(self):
+        return self._tx_prob_bucket
 
     def __len__(self):
         return self.m

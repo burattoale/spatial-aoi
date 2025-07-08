@@ -12,10 +12,10 @@ from environment import DTMC, NodeDistribution
 
 def do_simulation_pair(params:SimulationParameters, sim_length:int):
     params.beta = 0
-    time_evolution, mean_e_hmm, mean_est_error = hmm_entropy(params, sim_length)
+    time_evolution, mean_e_hmm, mean_est_error, mean_est_err_short = hmm_entropy(params, sim_length)
 
-    time_evolution_loc_aware, mean_e_hmm_loc_aware, mean_est_error_loc = hmm_entropy(params, sim_length, loc_aware=True)
-    time_evolution_loc_aware_mc, mean_e_hmm_loc_aware_mc, mean_est_error_loc_mc, _ = run_hmm_simulation(params, num_time_steps=sim_length, loc_aware=True)
+    time_evolution_loc_aware, mean_e_hmm_loc_aware, mean_est_error_loc, mean_est_e_loc_short = hmm_entropy(params, sim_length, loc_aware=True)
+    time_evolution_loc_aware_mc, mean_e_hmm_loc_aware_mc, mean_est_error_loc_mc, mean_est_e_loc_short_mc, _ = run_hmm_simulation(params, num_time_steps=sim_length, loc_aware=True)
      
 
     mean_e_forgetful, time_evolution_forgetful = run_monte_carlo_simulation(
@@ -30,7 +30,7 @@ def do_simulation_pair(params:SimulationParameters, sim_length:int):
     # plt.show()
     del time_evolution, time_evolution_forgetful, time_evolution_loc_aware, time_evolution_loc_aware_mc, _
 
-    return mean_e_forgetful, mean_e_hmm, mean_e_hmm_loc_aware, mean_e_hmm_loc_aware_mc, mean_est_error, mean_est_error_loc, mean_est_error_loc_mc
+    return mean_e_forgetful, mean_e_hmm, mean_e_hmm_loc_aware, mean_e_hmm_loc_aware_mc, mean_est_error, mean_est_error_loc, mean_est_error_loc_mc, mean_est_err_short, mean_est_e_loc_short, mean_est_e_loc_short_mc
 
 def parallel_k(k:int, params:SimulationParameters, sim_length:int, n_topologies:int, parallel_jobs:int):
     params.K = k
@@ -45,7 +45,7 @@ def parallel_k(k:int, params:SimulationParameters, sim_length:int, n_topologies:
     return averages
 
 if __name__ == "__main__":
-    sim_length = 30000
+    sim_length = 10000
     n_topologies = 50
     parallel_jobs = 5 # how many k to do symultaneously
     k_max = 50
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     R = 10
     K = 5
     m = math.floor(rho * np.pi * (K*R)**2)
-    alpha = 0.02
+    alpha = 0.1
     x_symbols = [0, 1]
     y_symbols = [0, 1, 2, 3]
     y_translation = {
@@ -126,9 +126,15 @@ if __name__ == "__main__":
     est_error_no_loc = res[:, 4]
     est_error_loc = res[:, 5]
     est_error_loc_mc = res[:,6]
-    plt.semilogy(np.arange(5,k_max,3)*R, est_error_no_loc, marker='.', label="HMM receiver")
-    plt.semilogy(np.arange(5,k_max,3)*R, est_error_loc, marker='.', label="HMM receiver loc aware")
-    plt.semilogy(np.arange(5,k_max,3)*R, est_error_loc_mc, linestyle=":", marker='.', label="HMM receiver loc aware Monte Carlo")
+    est_error_short_no_loc = res[:, 7]
+    est_error_short_loc = res[:, 8]
+    est_error_short_loc_mc = res[:, 9]
+    plt.semilogy(np.arange(5,k_max,3)*R, est_error_no_loc, marker='.', label="HMM receiver Viterbi")
+    plt.semilogy(np.arange(5,k_max,3)*R, est_error_loc, marker='.', label="HMM receiver loc aware Viterbi")
+    plt.semilogy(np.arange(5,k_max,3)*R, est_error_loc_mc, linestyle=":", marker='.', label="HMM receiver loc aware Monte Carlo Viterbi")
+    plt.semilogy(np.arange(5,k_max,3)*R, est_error_short_no_loc, linestyle="--", marker='x', label="HMM receiver")
+    plt.semilogy(np.arange(5,k_max,3)*R, est_error_short_loc, linestyle="--", marker='x', label="HMM receiver loc aware")
+    plt.semilogy(np.arange(5,k_max,3)*R, est_error_short_loc_mc, linestyle=":", marker='.', label="HMM receiver loc aware Monte Carlo")
     plt.xlabel("radius R [m]")
     plt.ylabel("average estimation error probability")
     plt.legend()

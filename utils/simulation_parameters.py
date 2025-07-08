@@ -1,5 +1,6 @@
 from typing import List, Any # Changed str|int to Any for broader Python versions
 from dataclasses import dataclass
+import numpy as np
 
 @dataclass
 class SimulationParameters(object):
@@ -8,7 +9,7 @@ class SimulationParameters(object):
     """
     q: float         # DTMC parameter
     eta: float       # DTMC parameter
-    zeta: float|List[float]      # Node transmission attempt rate
+    zeta: float|List[float]|np.ndarray      # Node transmission attempt rate
     epsilon: float   # Node transmission erasure probability
     m_override: int = None # If None, m is calculated from rho. Otherwise, use this value for number of nodes.
     rho: float = 1.0   # Node density (used if m_override is None)

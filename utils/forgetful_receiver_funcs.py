@@ -2,6 +2,8 @@
 import numpy as np
 from numba import jit
 from typing import List
+import os
+import pickle
 
 # Assuming poibin is installed: pip install poibin
 from .poibin import PoiBin
@@ -13,8 +15,9 @@ from .hmm_funcs import lam
 # If you have Numba, you can uncomment them for potential speedups.
 
 @jit 
-def prob_y_given_x_0(x:int, y:int, K:int, R_unit:float, alpha:float): # Renamed R to R_unit for clarity
+def prob_y_given_x_0(x:int, y:int, K:int, R_unit:float, alpha:float, prob_per_bucket:np.ndarray, lambda_vector:np.ndarray, p_d_vector:np.ndarray): # Renamed R to R_unit for clarity
     out = 0
+    sum_prob_buckets = np.sum(prob_per_bucket * p_d_vector)
     for d_idx in range(K): # d is bucket index
         # lam_val = lam(d_idx, alpha, R_unit, bypass=True) # R here is unit_radius
         # The prompt states "node in each region create information that is correct with the power law in the function lam"
@@ -22,7 +25,7 @@ def prob_y_given_x_0(x:int, y:int, K:int, R_unit:float, alpha:float): # Renamed 
         # P(Y=y | X=x, node in bucket d)
         # If y == x, it's a correct transmission for that bucket's characteristic prob.
         # If y != x, it's an incorrect transmission.
-        prob_correct_for_bucket = lam(d_idx, alpha, R_unit)
+        prob_correct_for_bucket = lambda_vector[d_idx]
         
         # (2*d_idx + 1) / (K**2) is the probability that a randomly chosen point
         # falls into the d_idx-th annulus (area weighting).
@@ -32,7 +35,7 @@ def prob_y_given_x_0(x:int, y:int, K:int, R_unit:float, alpha:float): # Renamed 
         # = pi * R_unit^2 * (2*d_idx + 1)
         # Total Area = pi * (K*R_unit)^2 = pi * K^2 * R_unit^2
         # Prob_d_idx = Area_d_idx / Total_Area = (2*d_idx + 1) / K^2
-        weight = (2 * d_idx + 1) / (K**2)
+        weight = p_d_vector[d_idx] * prob_per_bucket[d_idx]/sum_prob_buckets
 
         if y == x: # Received matches source
             out += weight * prob_correct_for_bucket
@@ -41,13 +44,28 @@ def prob_y_given_x_0(x:int, y:int, K:int, R_unit:float, alpha:float): # Renamed 
     return out
 
 @jit
-def prob_x_given_y_0(x:int, y:int, pi:np.ndarray, K:int, R_unit:float, alpha:float):
+def prob_y_given_x_0_spatial(x:int, y:int, K:int, p_succ:float, prob_d_given_tx_vector:np.ndarray, lambda_vector:np.ndarray):
+    valued_symbol = y // K
+    d_idx = y % K
+    if valued_symbol == 0 or valued_symbol == 1:
+        if x == valued_symbol:
+            total = p_succ * prob_d_given_tx_vector[d_idx] * lambda_vector[d_idx]
+        else:
+            total = p_succ * prob_d_given_tx_vector[d_idx] * (1-lambda_vector[d_idx])
+        return total
+    elif valued_symbol == 2:
+        return 1 - p_succ
+    else:
+        raise NotImplementedError
+
+@jit
+def prob_x_given_y_0(x:int, y:int, pi:np.ndarray, K:int, R_unit:float, alpha:float, prob_per_bucket:np.ndarray, lambda_vector:np.ndarray, p_d_vector:np.ndarray):
     # P(X=x | Y=y, Delta=0) = P(Y=y | X=x, Delta=0) * P(X=x) / P(Y=y | Delta=0)
     # P(Y=y | Delta=0) = sum_x' P(Y=y | X=x', Delta=0) * P(X=x')
-    p_y_given_x_0_val = prob_y_given_x_0(x, y, K, R_unit, alpha)
+    p_y_given_x_0_val = prob_y_given_x_0(x, y, K, R_unit, alpha, prob_per_bucket, lambda_vector, p_d_vector)
     
-    p_y_given_0_0 = prob_y_given_x_0(0, y, K, R_unit, alpha)
-    p_y_given_1_0 = prob_y_given_x_0(1, y, K, R_unit, alpha)
+    p_y_given_0_0 = prob_y_given_x_0(0, y, K, R_unit, alpha, prob_per_bucket, lambda_vector, p_d_vector)
+    p_y_given_1_0 = prob_y_given_x_0(1, y, K, R_unit, alpha, prob_per_bucket, lambda_vector, p_d_vector)
     
     p_y_0 = p_y_given_0_0 * pi[0] + p_y_given_1_0 * pi[1]
     
@@ -79,10 +97,10 @@ def h_y_delta(p_x_given_y_0_vec:np.ndarray, A_delta_power:np.ndarray, x_symbols=
     return out
 
 @jit
-def p_y(y:int, pi:np.ndarray, K:int, R_unit:float, alpha:float):
+def p_y(y:int, pi:np.ndarray, K:int, R_unit:float, alpha:float, prob_per_bucket:np.ndarray, lambda_vector:np.ndarray, p_d_vector:np.ndarray):
     # P(Y=y | Delta=0) (marginal probability of observing y when an update occurs)
-    prob_y_given_0_0 = prob_y_given_x_0(0, y, K, R_unit, alpha)
-    prob_y_given_1_0 = prob_y_given_x_0(1, y, K, R_unit, alpha)
+    prob_y_given_0_0 = prob_y_given_x_0(0, y, K, R_unit, alpha, prob_per_bucket, lambda_vector, p_d_vector)
+    prob_y_given_1_0 = prob_y_given_x_0(1, y, K, R_unit, alpha, prob_per_bucket, lambda_vector, p_d_vector)
     return prob_y_given_0_0 * pi[0] + prob_y_given_1_0 * pi[1]
 
 def ps_calc(m:int, zeta:float|List, epsilon:float): # Renamed to ps_calc to avoid conflict if ps is a variable
@@ -122,8 +140,16 @@ def p_delta_calc(prob_success_update:float, delta:int): # Renamed to p_delta_cal
     if delta < 0: return 0.0
     return prob_success_update * (1 - prob_success_update)**delta
 
-def overall_entropy(A:np.ndarray, pi:np.ndarray, K:int, R_unit:float, alpha:float, 
-                    m:int, zeta:float|List[float], epsilon:float, states: List, max_delta_considered: int = 20):
+def overall_entropy(A:np.ndarray, 
+                    pi:np.ndarray, 
+                    K:int, 
+                    R_unit:float, 
+                    alpha:float, 
+                    m:int, 
+                    zeta:float|List[float], 
+                    epsilon:float, 
+                    prob_per_bucket: List|np.ndarray, 
+                    max_delta_considered: int = 20):
     """
     Calculates the theoretical average entropy H(X_t | Y_n, Delta_n).
     This is E[h_y_delta] = sum_{y,delta} h_y_delta(..) * P(Y=y, Delta=delta)
@@ -145,19 +171,32 @@ def overall_entropy(A:np.ndarray, pi:np.ndarray, K:int, R_unit:float, alpha:floa
         # If ps_calc = 1, p_delta is 1 for delta=0, and 0 for delta > 0.
 
     y_symbols = [0, 1] # Assuming binary received messages
-    matrix_power_cache = {}
-    matrix_power_cache[0] = np.eye(A.shape[0])
-    matrix_power_cache[1] = A.copy()
+    filename = 'matrix_power_cache.pkl'
+
+    if os.path.exists(filename):
+        # Load the cache from the pickle file
+        with open(filename, 'rb') as f:
+            matrix_power_cache = pickle.load(f)
+    else:
+        matrix_power_cache = {}
+        matrix_power_cache[0] = np.eye(A.shape[0])
+        matrix_power_cache[1] = A.copy()
+
+    # lambda_vector
+    lambda_vector = [lam(d, alpha, R_unit) for d in range(K)]
+    p_d_vector = [(2 * d + 1) / (K**2) for d in range(K)]
+    lambda_vector = np.array(lambda_vector)
+    p_d_vector = np.array(p_d_vector)
 
     for y_val in y_symbols:
         # P(X_0 | Y_0=y_val)
         p_x_g_y0_vec = np.array([
-            prob_x_given_y_0(0, y_val, pi, K, R_unit, alpha),
-            prob_x_given_y_0(1, y_val, pi, K, R_unit, alpha)
+            prob_x_given_y_0(0, y_val, pi, K, R_unit, alpha, prob_per_bucket, lambda_vector, p_d_vector),
+            prob_x_given_y_0(1, y_val, pi, K, R_unit, alpha, prob_per_bucket, lambda_vector, p_d_vector)
         ])
 
         # Marginal probability of receiving y_val, given an update occurred
-        prob_y_val_at_update = p_y(y_val, pi, K, R_unit, alpha)
+        prob_y_val_at_update = p_y(y_val, pi, K, R_unit, alpha, prob_per_bucket, lambda_vector, p_d_vector)
 
         for delta_val in range(max_delta_considered + 1): # Sum over a practical range of delta
             # Conditional entropy H(X_delta | Y_0=y_val)
@@ -175,6 +214,11 @@ def overall_entropy(A:np.ndarray, pi:np.ndarray, K:int, R_unit:float, alpha:floa
             joint_prob_y_delta = prob_y_val_at_update * prob_delta
             
             total_entropy_sum += h_val * joint_prob_y_delta
+
+    # save the dictionary if it is new
+    if not os.path.exists(filename):
+        with open(filename, 'wb') as f:
+            pickle.dump(matrix_power_cache, f, protocol=pickle.HIGHEST_PROTOCOL)
             
     # Normalize if p_delta does not sum to 1 over max_delta_considered
     # sum_prob_delta = sum(p_delta_calc(prob_update_success, d) for d in range(max_delta_considered + 1))

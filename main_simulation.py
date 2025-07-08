@@ -13,12 +13,16 @@ from environment import *
 def run_monte_carlo_simulation(params: SimulationParameters,
                                num_time_steps: int,
                                num_burn_in_steps: int,
-                               seed: int = None):
+                               seed: int = None,
+                               zeta_bucket:bool = False):
     """
     Runs the Monte Carlo simulation and returns average entropy and its evolution.
     """
     rng = np.random.default_rng(seed)
-    simulation_seed, dtmc_seed, node_dist_seed = rng.integers(0, 2**32-1, 3, dtype=np.uint32)
+    if seed is None:
+        simulation_seed, dtmc_seed, node_dist_seed = rng.integers(0, 2**32-1, 3, dtype=np.uint32)
+    else:
+        simulation_seed, dtmc_seed, node_dist_seed = seed, seed, seed
 
 
     # 1. Initialize DTMC Source
@@ -31,7 +35,8 @@ def run_monte_carlo_simulation(params: SimulationParameters,
                                  zeta = params.zeta,
                                  alpha=params.alpha,
                                  beta=params.beta,
-                                 seed=int(node_dist_seed))
+                                 seed=int(node_dist_seed),
+                                 zeta_bucket=zeta_bucket)
 
     num_nodes = len(node_dist)
     if params.m_override is not None:
@@ -69,6 +74,11 @@ def run_monte_carlo_simulation(params: SimulationParameters,
     matrix_power_cache[0] = np.eye(dtmc.A.shape[0])
     matrix_power_cache[1] = dtmc.A.copy()
 
+    lambda_vector = [lam(d, params.alpha, params.R_unit) for d in range(params.K)]
+    p_d_vector = [(2 * d + 1) / (params.K**2) for d in range(params.K)]
+    lambda_vector = np.array(lambda_vector, dtype=float)
+    p_d_vector = np.array(p_d_vector, dtype=float)
+
     # Simulation loop (Burn-in + Collection)
     for t in range(num_burn_in_steps + num_time_steps):
         # A. Source Evolution
@@ -105,7 +115,7 @@ def run_monte_carlo_simulation(params: SimulationParameters,
             # Uses dtmc.pi (stationary distribution) for P(X=x) in Bayes rule
             p_x_given_y0_at_reception_vec = np.array([
                 prob_x_given_y_0(x_val, last_received_y, dtmc.pi,
-                                 params.K, params.R_unit, params.alpha)
+                                 params.K, params.R_unit, params.alpha, node_dist.tx_prob_bucket, lambda_vector, p_d_vector)
                 for x_val in params.X_symbols
             ])
 

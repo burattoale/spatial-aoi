@@ -21,6 +21,7 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, loc_aw
     alpha_vec = np.empty(2) # forward variables
     cs = np.zeros(simulation_length) # scaling coefficients
     entropies = np.zeros(simulation_length)
+    pred_X = np.empty_like(X_true)
 
     print(f"Starting simulation with {simulation_length} steps")
     print(f"Number of sensors: {local_params.m}")
@@ -32,6 +33,8 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, loc_aw
     alpha_vec[0] = hmm.pi[0] * cond_prob0
     alpha_vec[1] = hmm.pi[1] * cond_prob1
     cs[0] = 1
+    cumulative_cs_prod = cs[0]
+    pred_X[0] = np.argmax(alpha_vec/cumulative_cs_prod)
 
     # Viterbi algorithm initialization
     X_path = np.empty_like(Y, dtype=int) # state sequence
@@ -57,6 +60,7 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, loc_aw
         p_0_y_norm = alpha_vec[0] / np.sum(alpha_vec)
         p_1_y_norm = alpha_vec[1] / np.sum(alpha_vec)
         entropies[t] = - p_0_y_norm * np.log2(p_0_y_norm+1e-12) - p_1_y_norm * np.log2(p_1_y_norm+1e-12)
+        pred_X[t] = np.argmax(np.array(p_0_y_norm, p_1_y_norm))
 
         # viterbi algorithm recursion step
         for j in local_params.X_symbols:
@@ -72,8 +76,9 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, loc_aw
         X_path[t] = psi_matrix[t+1][X_path[t+1]]
     
     estimation_error_prob = np.sum(np.abs(X_path - X_true)) / simulation_length
+    short_est_prob = np.sum(np.abs(X_path - X_true)) / simulation_length
 
-    return entropies, np.mean(entropies), estimation_error_prob
+    return entropies, np.mean(entropies), estimation_error_prob, short_est_prob
 
 
 def run_hmm_simulation(params: SimulationParameters,
@@ -131,6 +136,7 @@ def run_hmm_simulation(params: SimulationParameters,
     cs = np.empty_like(Y, dtype=float)
     alpha_vec = np.zeros(len(local_params.X_symbols))
     last_received_y = 0# int(rng.choice(local_params.Y_symbols)) # Initial guess
+    pred_X = np.empty_like(Y)
 
     # Data collectors
     entropy_evolution = np.empty(num_time_steps, dtype=float) # To store H(X_t | Y_n, Delta_n) at each step after burn-in
@@ -149,6 +155,7 @@ def run_hmm_simulation(params: SimulationParameters,
     alpha_vec[0] = hmm.pi[0] * cond_prob0
     alpha_vec[1] = hmm.pi[1] * cond_prob1
     cs[0] = 1
+    pred_X[0] = np.argmax(alpha_vec)
 
     # Viterbi algorithm initialization
     X_path = np.empty_like(Y, dtype=int) # state sequence
@@ -212,6 +219,7 @@ def run_hmm_simulation(params: SimulationParameters,
         p_0_y_norm = alpha_vec[0] / np.sum(alpha_vec)
         p_1_y_norm = alpha_vec[1] / np.sum(alpha_vec)
         entropy = - p_0_y_norm * np.log2(p_0_y_norm+1e-12) - p_1_y_norm * np.log2(p_1_y_norm+1e-12)
+        pred_X = np.argmax(np.array(p_0_y_norm, p_1_y_norm))
             
         entropy_evolution[t] = entropy
         total_entropy_contribution += entropy
@@ -231,6 +239,7 @@ def run_hmm_simulation(params: SimulationParameters,
         X_path[t] = psi_matrix[t+1][X_path[t+1]]
     
     estimation_error_prob = np.sum(np.abs(X_path - X_true)) / num_time_steps
+    short_est_prob = np.sum(np.abs(X_path - X_true)) / num_time_steps
 
     estimated_avg_entropy = total_entropy_contribution / num_valid_steps_for_avg if num_valid_steps_for_avg > 0 else 0.0
     
@@ -245,7 +254,7 @@ def run_hmm_simulation(params: SimulationParameters,
         estimated_avg_entropy = h_source_fallback # Or NaN, or 0.0
         print("Warning: No valid steps for entropy averaging after burn-in.")
 
-    return entropy_evolution, estimated_avg_entropy, estimation_error_prob, Y
+    return entropy_evolution, estimated_avg_entropy, estimation_error_prob, short_est_prob, Y
 
 
 if __name__ == "__main__":
@@ -253,14 +262,14 @@ if __name__ == "__main__":
     # sim parameters
     q = 0.005
     eta = 1
-    zeta = 0.0001
+    zeta = 0.01
     epsilon = 0.1
     rho = 5e-2
     R = 10
-    K = 5
+    K = 2
     m = math.floor(rho * np.pi * (R*K)**2)
     print(f"Number of sensors: {m}")
-    alpha = 0.02
+    alpha = 0.25
     x_symbols = [0, 1]
     y_symbols = [0, 1, 2, 3]
     # spatial HMM
@@ -274,8 +283,8 @@ if __name__ == "__main__":
 
     local_params = SimulationParameters(q, eta, zeta, epsilon, rho=rho, m=m, K=K, alpha=alpha, R_unit=R, X_symbols=x_symbols, Y_symbols=y_symbols)
 
-    entropies, _, est_error_no_loc = hmm_entropy(local_params, sim_length, loc_aware=False)
-    mc_entropies, _, _, _ = run_hmm_simulation(local_params, sim_length, loc_aware=False)
+    entropies, _, est_error_no_loc, _ = hmm_entropy(local_params, sim_length, loc_aware=False)
+    mc_entropies, _, _, _, _ = run_hmm_simulation(local_params, sim_length, loc_aware=False)
 
 
 
@@ -294,8 +303,8 @@ if __name__ == "__main__":
     plt.savefig("plots/sequence_entropy_1.png", bbox_inches="tight", pad_inches=0)
     plt.close()
 
-    entropies, _, est_error_yes_loc = hmm_entropy(local_params, sim_length, loc_aware=True)
-    mc_entropies, _, _, _ = run_hmm_simulation(local_params, sim_length, loc_aware=True)
+    entropies, _, est_error_yes_loc, _ = hmm_entropy(local_params, sim_length, loc_aware=True)
+    mc_entropies, _, _, _, _ = run_hmm_simulation(local_params, sim_length, loc_aware=True)
 
     print(f"Estimation error NO localization aware: {est_error_no_loc}")
     print(f"Estimation error YES localization aware: {est_error_yes_loc}")
@@ -316,35 +325,41 @@ if __name__ == "__main__":
     plt.close()
 
     plt.figure(0)
-    entropy_no_loc, _, est_error_no_loc, Y1 = run_hmm_simulation(local_params, 10000, loc_aware=False, seed=0)
-    entropy_yes_loc, _, est_error_yes_loc, Y2 = run_hmm_simulation(local_params, 10000, loc_aware=True, seed=0)
+    entropy_no_loc, _, est_error_no_loc, est_short_no_loc, Y1 = run_hmm_simulation(local_params, 10000, loc_aware=False, seed=0)
+    entropy_yes_loc, _, est_error_yes_loc, est_short_yes_loc, Y2 = run_hmm_simulation(local_params, 10000, loc_aware=True, seed=0)
     plt.plot(entropy_no_loc, label="Entropy no location")
     plt.plot(entropy_yes_loc, label="Entropy location aware")
     plt.savefig("plots/compare_yes_no_location.png", bbox_inches="tight", pad_inches=0)
     print(Y1)
     print(Y2)
-    print(f"Estimation error NO localization aware: {est_error_no_loc}")
-    print(f"Estimation error YES localization aware: {est_error_yes_loc}")
+    print(f"Estimation error NO localization aware: {est_error_no_loc}, {est_short_no_loc}")
+    print(f"Estimation error YES localization aware: {est_error_yes_loc}, {est_short_yes_loc}")
     plt.legend()
     plt.grid()
     #plt.show()
     plt.close()
 
-    Ks = np.arange(2,60)
+    Ks = np.arange(2,3)
     sim_length = 10000
     errors_no_loc = []
+    errors_short_no_loc = []
     errors_yes_loc = []
+    errors_short_yes_loc = []
     for k in Ks:
         local_params.K = int(k)
         local_params.Y_symbols = [i for i in range(len(x_symbols) * k + 2)]
-        _, _, e_no_loc, _ = run_hmm_simulation(local_params, sim_length, loc_aware=False, seed=0)
-        _, _, e_yes_loc, _ = run_hmm_simulation(local_params, sim_length, loc_aware=True, seed=0)
+        _, _, e_no_loc, e_short_no_loc, _ = run_hmm_simulation(local_params, sim_length, loc_aware=False, seed=0)
+        _, _, e_yes_loc, e_short_yes_loc, _ = run_hmm_simulation(local_params, sim_length, loc_aware=True, seed=0)
         errors_no_loc.append(e_no_loc)
         errors_yes_loc.append(e_yes_loc)
+        errors_short_no_loc.append(e_short_no_loc)
+        errors_short_yes_loc.append(e_short_yes_loc)
 
     plt.figure()
-    plt.semilogy(Ks, errors_no_loc, marker='.', label="HMM")
-    plt.semilogy(Ks, errors_yes_loc, marker='.', label="HMM loc. aware")
+    plt.semilogy(Ks, errors_no_loc, marker='.', label="HMM Viterbi")
+    plt.semilogy(Ks, errors_yes_loc, marker='.', label="HMM loc. aware Viterbi")
+    plt.semilogy(Ks, errors_short_no_loc, marker="x", label="HMM limited seq.")
+    plt.semilogy(Ks, errors_short_yes_loc, marker="x", label="HMM loc. aware limited seq.")
     plt.xlabel("Number of sections, K")
     plt.ylabel("Estimation error probability")
     plt.legend()
