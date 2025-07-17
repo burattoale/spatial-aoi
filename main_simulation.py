@@ -182,14 +182,14 @@ if __name__ == "__main__":
     # For now, assume NodeDistribution can use a list of base zetas, or the first element if it's a list of one.
     initial_params = SimulationParameters(
         q=0.005,
-        eta=1,
+        eta=50,
         zeta=5e-4, # Example: list of base probabilities. NodeDistribution will use this.
         epsilon=0.1,
         rho=0.05,
         m_override=None,
         K=5, # Initial K for the first plot
         alpha=0.02,
-        beta=0.02, # Default beta, will be overridden in the loop
+        beta=0, # Default beta, will be overridden in the loop
         R_unit=10
     )
 
@@ -223,12 +223,12 @@ if __name__ == "__main__":
 
     if m_calc_initial > 0:
         p_success_initial_k = ps_calc(m_calc_initial, _node_dist_initial.tx_probabilities, initial_params.epsilon)
-        max_delta_initial_k = 1000#max(50, int(2 / (p_success_initial_k + 1e-9)))
+        max_delta_initial_k = 10000#max(50, int(2 / (p_success_initial_k + 1e-9)))
         theoretical_entropy_initial = overall_entropy(
             A=dtmc_theoretical.A, pi=dtmc_theoretical.pi, K=initial_params.K,
             R_unit=initial_params.R_unit, alpha=initial_params.alpha, m=m_calc_initial,
             zeta=_node_dist_initial.tx_probabilities, epsilon=initial_params.epsilon,
-            states=initial_params.X_symbols, max_delta_considered=max_delta_initial_k
+            prob_per_bucket=_node_dist_initial.tx_prob_bucket, max_delta_considered=max_delta_initial_k
         )
         print(f"Theoretical H(X_t | Y_n, Delta_n) (for K={initial_params.K}, beta={initial_params.beta}): {theoretical_entropy_initial:.4f}")
     else:

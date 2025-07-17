@@ -84,6 +84,7 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, loc_aw
 def run_hmm_simulation(params: SimulationParameters,
                                num_time_steps: int,
                                loc_aware=False,
+                               non_binary=False,
                                seed: int = None):
     """
     Runs the Monte Carlo simulation and returns average entropy and its evolution.
@@ -98,8 +99,10 @@ def run_hmm_simulation(params: SimulationParameters,
     # 1. Initialize HMM Source
     local_params:SimulationParameters = copy.deepcopy(params)
     local_params.beta = 0
-    if not loc_aware:
+    if not loc_aware and not non_binary:
         local_params.Y_symbols = [0, 1, 2, 3]
+        hmm = HiddenMM(local_params, hmm_seed)
+    elif non_binary and not loc_aware:
         hmm = HiddenMM(local_params, hmm_seed)
     else:
         hmm = SpatialHMM(local_params, hmm_seed)
@@ -111,7 +114,8 @@ def run_hmm_simulation(params: SimulationParameters,
                                  zeta = local_params.zeta,
                                  alpha=local_params.alpha,
                                  beta=local_params.beta,
-                                 seed=int(node_dist_seed))
+                                 seed=int(node_dist_seed),
+                                 zeta_bucket=True)
 
     num_nodes = len(node_dist)
     if local_params.m_override is not None:
@@ -150,10 +154,8 @@ def run_hmm_simulation(params: SimulationParameters,
 
     X_true[0] = hmm.hidden_state
     Y[0] = int(rng.choice(local_params.Y_symbols, p=hmm.B[X_true[0]])) # initialize first received symbol
-    cond_prob0 = hmm.B[0, Y[0]]
-    cond_prob1 = hmm.B[1, Y[0]]
-    alpha_vec[0] = hmm.pi[0] * cond_prob0
-    alpha_vec[1] = hmm.pi[1] * cond_prob1
+    cond_prob_vec = hmm.B[:, Y[0]]
+    alpha_vec = hmm.pi * cond_prob_vec
     cs[0] = 1
     pred_X[0] = np.argmax(alpha_vec)
 
@@ -202,24 +204,21 @@ def run_hmm_simulation(params: SimulationParameters,
             if loc_aware:
                 last_received_y = 2 * local_params.K + 1
             else:
-                last_received_y = 3
+                last_received_y = local_params.Y_symbols[-1]
 
         # D. Entropy Contribution
         Y[t] = last_received_y
         # compute entropy
-        temp0, temp1 = 0, 0
-        for id in range(2): # only two states
-            temp0 += alpha_vec[id] * hmm.A[id, 0]
-            temp1 += alpha_vec[id] * hmm.A[id, 1]
-        alpha_vec[0] = temp0 * hmm.B[0, Y[t]]
-        alpha_vec[1] = temp1 * hmm.B[1, Y[t]]
+        temp_vec = np.zeros(len(local_params.X_symbols))
+        for id in range(len(local_params.X_symbols)): # only two states
+            temp_vec[id] = np.sum(alpha_vec * hmm.A[:,id])
+        alpha_vec = temp_vec * hmm.B[:, Y[t]]
         cs[t] = np.sum(alpha_vec)
         alpha_vec /= cs[t] # normalize the forward probabilities
 
-        p_0_y_norm = alpha_vec[0] / np.sum(alpha_vec)
-        p_1_y_norm = alpha_vec[1] / np.sum(alpha_vec)
-        entropy = - p_0_y_norm * np.log2(p_0_y_norm+1e-12) - p_1_y_norm * np.log2(p_1_y_norm+1e-12)
-        pred_X = np.argmax(np.array(p_0_y_norm, p_1_y_norm))
+        p_x_y_norm = alpha_vec / np.sum(alpha_vec)
+        entropy = - np.sum(p_x_y_norm * np.log2(p_x_y_norm+1e-12))
+        pred_X = np.argmax(p_x_y_norm)
             
         entropy_evolution[t] = entropy
         total_entropy_contribution += entropy

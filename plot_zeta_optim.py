@@ -4,7 +4,7 @@ import pickle
 import os
 from scipy.optimize import least_squares
 
-with open("results/zeta_optim_formulas_extreme.pickle", "rb") as f:
+with open("results/zeta_optim_hmm_12.pickle", "rb") as f:
     data:dict = pickle.load(f)
 
 optimized_entropy = []

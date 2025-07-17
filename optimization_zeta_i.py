@@ -8,12 +8,13 @@ import copy
 from main_simulation import run_monte_carlo_simulation
 from utils import SimulationParameters, overall_entropy
 from environment import DTMC, NodeDistribution
+from hmm_joint_prob import run_hmm_simulation
 
 def objective(trial:optuna.Trial, params:SimulationParameters):
     local_params = copy.deepcopy(params)
     zeta = []
     lower = 0
-    upper = 5e-2
+    upper = 5e-4
     for i in range(local_params.K): # use m if you want to optimize for the single node and not by region
         value = trial.suggest_float(f"zeta_{i}", lower, upper)
         # fast fail in case everything breaks
@@ -42,16 +43,17 @@ def objective(trial:optuna.Trial, params:SimulationParameters):
             zeta_bucket=True
         )
         # entropy, _ = run_monte_carlo_simulation(local_params, 10000, 100, seed=0, zeta_bucket=True) # fix the seed to actually optimize the zeta
-        entropy = overall_entropy(A=dtmc.A,
-                                  pi=dtmc.pi,
-                                  K=local_params.K,
-                                  R_unit=local_params.R_unit,
-                                  alpha=local_params.alpha,
-                                  m=len(node_dist),
-                                  zeta=node_dist.tx_probabilities,
-                                  epsilon=local_params.epsilon,
-                                  prob_per_bucket=zeta,
-                                  max_delta_considered=10000)
+        #entropy = overall_entropy(A=dtmc.A,
+        #                          pi=dtmc.pi,
+        #                          K=local_params.K,
+        #                          R_unit=local_params.R_unit,
+        #                          alpha=local_params.alpha,
+        #                          m=len(node_dist),
+        #                          zeta=node_dist.tx_probabilities,
+        #                          epsilon=local_params.epsilon,
+        #                          prob_per_bucket=zeta,
+        #                          max_delta_considered=10000)
+        _, entropy, _, _, _ = run_hmm_simulation(local_params, 10000)
         trial.report(entropy, j)
         if trial.should_prune():
             raise optuna.TrialPruned()
@@ -78,7 +80,7 @@ if __name__ == "__main__":
     results = {}
 
     last_best_params = None
-    for k in range(1, 4):
+    for k in range(1, 21):
         current_params = copy.deepcopy(initial_params)
         current_params.K = k
         current_params.m = math.floor(current_params.rho * np.pi * (current_params.K*current_params.R_unit)**2)
@@ -90,20 +92,20 @@ if __name__ == "__main__":
                                     pruner=optuna.pruners.MedianPruner()
                                     )
         # warm start the optimization
-        initial_guesses = {f"params_{n}": {f"zeta_{i}":n * 1e-4 for i in range(k)} for n in range(1,5)}
+        initial_guesses = {f"params_{n}": {f"zeta_{i}":n * 1e-4 for i in range(k)} for n in range(1,6)}
         initial_guesses["last_best"] = last_best_params if last_best_params is not None else {f"zeta_{i}":9e-5 for i in range(k)}
         for params in initial_guesses.values():
             study.enqueue_trial(params)
 
         # start the optimization
         if k < 9:
-            study.optimize(wrapped_objective, n_trials=1000, n_jobs=10)
+            study.optimize(wrapped_objective, n_trials=1000, n_jobs=2)
         else:
-            study.optimize(wrapped_objective, n_trials=50, n_jobs=10)
+            study.optimize(wrapped_objective, n_trials=1000, n_jobs=2)
         # compute the entropy for the fixed zeta case zeta = 1e-4
         if isinstance(initial_params.zeta, float):
             current_params.zeta = np.array([initial_params.zeta] * k)
-        entropy, _ = run_monte_carlo_simulation(current_params, 10000, 100, seed=0, zeta_bucket=True)
+        _, entropy, _, _, _ = run_hmm_simulation(current_params, 10000, seed=0)
         # get the best parameters and save them with the best objective
         results[k] = {"zeta": study.best_params,
                       "entropy_opt": study.best_value,
@@ -112,6 +114,6 @@ if __name__ == "__main__":
         last_best_params = study.best_params
         last_best_params[f"zeta_{k}"] = 0
         
-        # save partial resuts
-        with open("results/zeta_optim_formulas_extreme.pickle", "wb") as f:
+        # save partial results
+        with open("results/zeta_optim_hmm_12.pickle", "wb") as f:
             pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)

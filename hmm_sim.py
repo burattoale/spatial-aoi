@@ -11,7 +11,7 @@ if __name__ == "__main__":
      # sim parameters
     q = 0.01
     eta = 1
-    zeta = 0.002
+    zeta = 5e-4
     epsilon = 0
     rho = 5e-2
     R = 10

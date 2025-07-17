@@ -9,11 +9,6 @@ import pickle
 from .poibin import PoiBin
 from .hmm_funcs import lam
 
-
-# If Numba is not available, comment out @jit decorators
-# For simplicity in this setup, I will comment them out.
-# If you have Numba, you can uncomment them for potential speedups.
-
 @jit 
 def prob_y_given_x_0(x:int, y:int, K:int, R_unit:float, alpha:float, prob_per_bucket:np.ndarray, lambda_vector:np.ndarray, p_d_vector:np.ndarray): # Renamed R to R_unit for clarity
     out = 0
@@ -66,6 +61,21 @@ def prob_x_given_y_0(x:int, y:int, pi:np.ndarray, K:int, R_unit:float, alpha:flo
     
     p_y_given_0_0 = prob_y_given_x_0(0, y, K, R_unit, alpha, prob_per_bucket, lambda_vector, p_d_vector)
     p_y_given_1_0 = prob_y_given_x_0(1, y, K, R_unit, alpha, prob_per_bucket, lambda_vector, p_d_vector)
+    
+    p_y_0 = p_y_given_0_0 * pi[0] + p_y_given_1_0 * pi[1]
+    
+    if p_y_0 == 0: # Avoid division by zero; implies this y is impossible
+        return 0.0 
+    return p_y_given_x_0_val * pi[x] / p_y_0
+
+@jit
+def prob_x_given_y_0_spatial(x:int, y:int, pi:np.ndarray, K:int, p_succ:float, prob_d_given_tx_vector:np.ndarray, lambda_vector:np.ndarray):
+    # P(X=x | Y=y, Delta=0) = P(Y=y | X=x, Delta=0) * P(X=x) / P(Y=y | Delta=0)
+    # P(Y=y | Delta=0) = sum_x' P(Y=y | X=x', Delta=0) * P(X=x')
+    p_y_given_x_0_val = prob_y_given_x_0_spatial(x, y, K, p_succ, prob_d_given_tx_vector, lambda_vector)
+    
+    p_y_given_0_0 = prob_y_given_x_0_spatial(0, y, K, p_succ, prob_d_given_tx_vector, lambda_vector)
+    p_y_given_1_0 = prob_y_given_x_0_spatial(1, y, K, p_succ, prob_d_given_tx_vector, lambda_vector)
     
     p_y_0 = p_y_given_0_0 * pi[0] + p_y_given_1_0 * pi[1]
     

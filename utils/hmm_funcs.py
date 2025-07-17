@@ -7,13 +7,18 @@ def lam(d:int, alpha:float=0.02, R:float=10, bypass=False):
         return 1
     return 1 / (1 + d * R)**alpha
 
-@jit   
-def cond_prob_y_given_x(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
+
+def cond_prob_y_given_x(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10, poibin:bool=False, p_succ=None, p_idle=None):
     """
     Compute the conditional probability of Y=y|X=x
     """
-    ps = m * zeta * (1 - epsilon) * (1 - zeta * (1 - epsilon))**(m-1)
-    pi = (1 - zeta * (1 - epsilon))**m
+    if poibin:
+        assert p_succ is not None and p_idle is not None
+        ps = p_succ
+        pi = p_idle
+    else:
+        ps = m * zeta * (1 - epsilon) * (1 - zeta * (1 - epsilon))**(m-1)
+        pi = (1 - zeta * (1 - epsilon))**m
     if y == 0 or y == 1:
         if x == y:
             total = 0
@@ -31,6 +36,21 @@ def cond_prob_y_given_x(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:f
     if y == 3:
         return pi
     raise NotImplementedError
+
+def cond_prob_y_given_x_non_binary(y, x, zeta, epsilon, m:int, K:int, lambda_mat:np.ndarray, states_cardinality:int, poibin:bool=False, p_succ=None):
+    if poibin:
+        assert p_succ is not None
+        ps = p_succ
+    else:
+        ps = m * zeta * (1 - epsilon) * (1 - zeta * (1 - epsilon))**(m-1)
+    if y < states_cardinality:    
+        total = 0
+        for d in range(K):
+            total += lambda_mat[x,y,d] * (2*d + 1) / K**2
+        total *= ps
+        return total
+    else: 
+        return 1 - ps
 
 @jit   
 def cond_prob_y_given_x_spatial(y, x, zeta, epsilon, m:int, K:int, alpha:float=0.02, R:float=10):
