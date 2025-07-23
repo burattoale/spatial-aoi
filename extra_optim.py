@@ -12,38 +12,34 @@ from hmm_joint_prob import run_hmm_simulation
 
 def objective(trial:optuna.Trial, params:SimulationParameters):
     local_params = copy.deepcopy(params)
-    zeta = []
     lower = 0
     upper = 5e-4
-    for i in range(local_params.K): # use m if you want to optimize for the single node and not by region
-        value = trial.suggest_float(f"zeta_{i}", lower, upper)
-        # fast fail in case everything breaks
-        if value > upper:
-            raise optuna.TrialPruned()
-        zeta.append(value)
-        upper = value
-    
-    zeta = np.array(zeta)
-    local_params.zeta = zeta
+    value = trial.suggest_float("zeta_last", lower, upper)
+    zeta = [upper]*(local_params.K-1)
+    if local_params.K == 14:
+        zeta[-1] = 5e-4
+    zeta.append(value)
+    local_params.zeta = np.array(zeta)
+
     # using Monte Carlo simulation
     # entropy, _ = run_monte_carlo_simulation(local_params, 10000, 100, seed=0, zeta_bucket=True) # fix the seed to actually optimize the zeta
 
     # using formulas and averaging 10 different topologies
-    dtmc = DTMC(local_params.q, local_params.eta)
+    #dtmc = DTMC(local_params.q, local_params.eta)
     NUM_RUNS = 15
     entropies = np.empty(NUM_RUNS, dtype=float)
     for j in range(NUM_RUNS):
-        node_dist = NodeDistribution(
-            rho=local_params.rho,
-            unit_radius=local_params.R_unit,
-            K=local_params.K,
-            zeta=zeta,
-            alpha=local_params.alpha,
-            beta=local_params.beta,
-            seed=j,
-            zeta_bucket=True,
-            fixed_nodes_per_region=True
-        )
+        #node_dist = NodeDistribution(
+        #    rho=local_params.rho,
+        #    unit_radius=local_params.R_unit,
+        #    K=local_params.K,
+        #    zeta=zeta,
+        #    alpha=local_params.alpha,
+        #    beta=local_params.beta,
+        #    seed=j,
+        #    zeta_bucket=True,
+        #    fixed_nodes_per_region=True
+        #)
         # entropy, _ = run_monte_carlo_simulation(local_params, 10000, 100, seed=0, zeta_bucket=True) # fix the seed to actually optimize the zeta
         #entropy = overall_entropy(A=dtmc.A,
         #                          pi=dtmc.pi,
@@ -57,11 +53,9 @@ def objective(trial:optuna.Trial, params:SimulationParameters):
         #                          max_delta_considered=10000)
         _, entropy, _, _, _ = run_hmm_simulation(local_params, 10000, fixed_nodes_per_region=True, seed=j)
         entropies[j] = entropy
-        trial.report(entropy, j)
+        trial.report(entropies[j], j)
         if trial.should_prune():
             raise optuna.TrialPruned()
-        entropies[j] = entropy
-    print(entropies)
     return np.mean(entropies)
 
 if __name__ == "__main__":
@@ -95,7 +89,8 @@ if __name__ == "__main__":
                                     pruner=optuna.pruners.MedianPruner()
                                     )
         # warm start the optimization
-        initial_guesses = {f"params_{n}": {f"zeta_{i}":n * 1e-4 for i in range(k)} for n in range(1,6)}
+        values_to_try = [0, 5e-4, 5e-5, 5e-6, 5e-7, 5e-8, 5e-9]
+        initial_guesses = {f"params_{n}": {f"zeta_last": val} for n, val in enumerate(values_to_try)}
         initial_guesses["last_best"] = last_best_params if last_best_params is not None else {f"zeta_{i}":9e-5 for i in range(k)}
         for params in initial_guesses.values():
             study.enqueue_trial(params)
@@ -108,15 +103,17 @@ if __name__ == "__main__":
         # compute the entropy for the fixed zeta case zeta = 1e-4
         if isinstance(initial_params.zeta, float):
             current_params.zeta = np.array([initial_params.zeta] * k)
-        _, entropy, _, _, _ = run_hmm_simulation(current_params, 10000, seed=0, fixed_nodes_per_region=True)
+        fixed_entropies = []
+        for i in range(15):
+            _, entropy, _, _, _ = run_hmm_simulation(current_params, 10000, seed=i, fixed_nodes_per_region=True)
+            fixed_entropies.append(entropy)
+        entropy = np.mean(fixed_entropies)
         # get the best parameters and save them with the best objective
         results[k] = {"zeta": study.best_params,
                       "entropy_opt": study.best_value,
                       "entropy_same_z": entropy
                       }
         last_best_params = study.best_params
-        last_best_params[f"zeta_{k}"] = 0
+        last_best_params[f"zeta_last"] = 0
         
-        # save partial results
-        with open("results/zeta_optim_hmm_7-14.pickle", "wb") as f:
-            pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
+    print(results)

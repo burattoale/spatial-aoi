@@ -83,8 +83,9 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, loc_aw
 
 def run_hmm_simulation(params: SimulationParameters,
                                num_time_steps: int,
-                               loc_aware=False,
-                               non_binary=False,
+                               loc_aware:bool=False,
+                               non_binary:bool=False,
+                               fixed_nodes_per_region:bool=False,
                                seed: int = None):
     """
     Runs the Monte Carlo simulation and returns average entropy and its evolution.
@@ -115,7 +116,8 @@ def run_hmm_simulation(params: SimulationParameters,
                                  alpha=local_params.alpha,
                                  beta=local_params.beta,
                                  seed=int(node_dist_seed),
-                                 zeta_bucket=True)
+                                 zeta_bucket=True,
+                                 fixed_nodes_per_region=fixed_nodes_per_region)
 
     num_nodes = len(node_dist)
     if local_params.m_override is not None:
@@ -132,7 +134,10 @@ def run_hmm_simulation(params: SimulationParameters,
         return h_source, entropy_evolution
 
 
-    print(f"Simulation started with {num_nodes} nodes.")
+    # print(f"Simulation started with {num_nodes} nodes.")
+    # if fixed_nodes_per_region:
+    #     print(f"Nodes per region: {node_dist.nodes_per_region}")
+    #     print(f"Total number of fixed nodes: {np.sum(node_dist.nodes_per_region)}")
 
     # 3. Initialize Receiver State
     X_true = np.empty(num_time_steps, dtype=int)

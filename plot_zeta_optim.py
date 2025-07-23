@@ -4,7 +4,7 @@ import pickle
 import os
 from scipy.optimize import least_squares
 
-with open("results/zeta_optim_hmm_12.pickle", "rb") as f:
+with open("results/zeta_optim_formulas_partial.pickle", "rb") as f:
     data:dict = pickle.load(f)
 
 optimized_entropy = []
@@ -15,7 +15,7 @@ for k in data.keys():
 
 plt.figure()
 plt.plot(list(data.keys()), optimized_entropy, marker=".", label="Entropy optimized $\zeta_i$")
-plt.plot(list(data.keys()), non_optimized_entropy, marker="x", linestyle="--", label="Entropy same $\zeta=1e-4$")
+plt.plot(list(data.keys()), non_optimized_entropy, marker="x", linestyle="--", label="Entropy same $\zeta=5e-4$")
 plt.xlabel("Number of regions, K")
 plt.ylabel("Estimation entropy")
 plt.legend()

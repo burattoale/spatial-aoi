@@ -177,3 +177,4 @@ plots/
 results
 *.prof
 *.pkl
+.idea/
