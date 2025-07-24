@@ -18,7 +18,8 @@ initial_params = SimulationParameters(
         K=2, # Initial K for the first plot
         alpha=0.02,
         beta=0, # Default beta, will be overridden in the loop
-        R_unit=10
+        R_unit=10,
+        Y_symbols=[0,1,2]
     )
 sim_length = 10000
 avg_bin = []
@@ -38,7 +39,7 @@ for k in tqdm(range(5,20)):
     temp_bin = []
     temp_tri = []
     temp_quad = []
-    for i in range(10):
+    for i in range(2):
         _, avg_entropy_bin, _, _, _ = run_hmm_simulation(params_bin, sim_length, seed=i, non_binary=False)
         _, avg_entropy_tri, _, _, _ = run_hmm_simulation(params_tri, sim_length, seed=i, non_binary=True)
         _, avg_entropy_quad, _, _, _ = run_hmm_simulation(params_quad, sim_length, seed=i, non_binary=True)

@@ -7,7 +7,7 @@ class Node(object):
     Represents the transmission node with its position, distance to center,
     and probability of having a correct transmission.
     """
-    def __init__(self, position:Tuple[float, float], unit_radius:float, buckets:List[Tuple[float,float]], zeta:float, alpha:float, beta:float, coordinates:str="radial"):
+    def __init__(self, position:Tuple[float, float], unit_radius:float, buckets:List[Tuple[float,float]], zeta:float, alpha:float, coordinates:str="radial"):
         """
         :param position: The position of the node
         :type position: Tuple[float, float]
@@ -19,8 +19,6 @@ class Node(object):
         :type zeta: float
         :param alpha: The exponent of the power law for the correct probability.
         :type alpha: float
-        :param beta: The exponent of the power law for the transmission probability.
-        :type beta: float
         :param coordinates: Specify the type of coordinates used for position. Can be radial or cartesian.
         :type coordinates: str
         """
@@ -30,7 +28,7 @@ class Node(object):
         self.distance = self._compute_distance()
         self.d_idx = self._get_bucket_idx(buckets)
         self.correct_probability = self._compute_correct_prob(alpha)
-        self.tx_probability = self._compute_tx_prob(zeta, beta)
+        self.tx_probability = self._compute_tx_prob(zeta)
 
     @property
     def lam(self):
@@ -74,19 +72,17 @@ class Node(object):
         """
         return (1 + self.d_idx * self.unit_radius)**(-alpha)
     
-    def _compute_tx_prob(self, zeta, beta:float) -> float:
+    def _compute_tx_prob(self, zeta) -> float:
         """
         Compute the probability that the information form this node is correct.
 
         :param zeta: The single node transmission probability.
         :type zeta: float
-        :param beta: The exponent of the power law for the probability.
-        :type beta: float
 
         :returns: The transmission probabilitz of the node.
         :rtype: float
         """
-        return zeta * (1 + self.d_idx * self.unit_radius)**(-beta)
+        return zeta
     
     def _get_bucket_idx(self, bucket_list:List[Tuple[float,float]]) -> int:
         """

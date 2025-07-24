@@ -24,7 +24,6 @@ class NodeDistribution(object):
                 K: int, 
                 zeta:float|np.ndarray, 
                 alpha:float, 
-                beta:float, 
                 seed: int = None, 
                 zeta_bucket:bool=False,
                 fixed_nodes_per_region:bool=False):
@@ -37,8 +36,6 @@ class NodeDistribution(object):
         :type K: int
         :param alpha: The exponent of the power law for the correct probability.
         :type alpha: float
-        :param beta: The exponent of the power law for the transmission probability.
-        :type beta: float
         :param seed: the seed for the RNG.
         :type seed: int
         """
@@ -72,15 +69,15 @@ class NodeDistribution(object):
             sampled_points = [self._sample_circle() for _ in range(self.m)]
         # Pass alpha to Node constructor
         if isinstance(zeta, float):
-            self._nodes = [Node(point, self.unit_radius, buckets, zeta=zeta, alpha=alpha, beta=beta) for point in sampled_points]
+            self._nodes = [Node(point, self.unit_radius, buckets, zeta=zeta, alpha=alpha) for point in sampled_points]
             self._tx_probabilities = [n.zeta for n in self.nodes]
             self._tx_prob_bucket = np.array([zeta] * K)
         elif isinstance(zeta, np.ndarray) and not zeta_bucket:
-            self._nodes = [Node(point, self.unit_radius, buckets, zeta=z, alpha=alpha, beta=beta) for z, point in zip(zeta,sampled_points)]
+            self._nodes = [Node(point, self.unit_radius, buckets, zeta=z, alpha=alpha) for z, point in zip(zeta,sampled_points)]
             self._tx_probabilities = zeta.tolist()
             self._tx_prob_bucket = np.array([zeta] * K)
         elif isinstance(zeta, np.ndarray) and zeta_bucket:
-            self._nodes = [Node(point, self.unit_radius, buckets, zeta=zeta, alpha=alpha, beta=beta) for point in sampled_points]
+            self._nodes = [Node(point, self.unit_radius, buckets, zeta=zeta, alpha=alpha) for point in sampled_points]
             for n in self._nodes:
                 n.tx_probability = zeta[n.zone_idx]
             self._tx_probabilities = [n.zeta for n in self.nodes]

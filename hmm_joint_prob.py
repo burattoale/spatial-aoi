@@ -9,13 +9,31 @@ from environment import NodeDistribution, Node
 from utils import SimulationParameters
 from utils import cond_prob_y_given_x, sequence_entropy
 
-def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, loc_aware=False):
+def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, seed=None, loc_aware=False, non_binary=False):
+    # initialize rng and copy parameters to avoid unwanted side-effects
     local_params:SimulationParameters = copy.deepcopy(params)
-    if not loc_aware:
-        local_params.Y_symbols = [0, 1, 2, 3]
-        hmm = HiddenMM(local_params)
+    rng = np.random.default_rng(seed)
+
+    # node distribution just to be sure to get the per-bucket transmission probability vector
+    node_dist = NodeDistribution(rho=local_params.rho,
+                                 unit_radius=local_params.R_unit,
+                                 K=local_params.K,
+                                 zeta = local_params.zeta,
+                                 alpha=local_params.alpha,
+                                 seed=seed,
+                                 zeta_bucket=True,
+                                 fixed_nodes_per_region=True)
+
+    if not loc_aware and not non_binary: # normal operation
+        assert len(local_params.X_symbols) == 2
+        assert len(local_params.Y_symbols) == 3
+        hmm = HiddenMM(local_params, node_dist.tx_prob_bucket, seed)
+    elif non_binary and not loc_aware:
+        hmm = HiddenMM(local_params, node_dist.tx_prob_bucket, seed)
+    elif not non_binary and loc_aware:
+        hmm = SpatialHMM(local_params, node_dist.tx_prob_bucket, seed)
     else:
-        hmm = SpatialHMM(local_params)
+        raise NotImplementedError("The combination of flags is not yet implemented.")
     Y = np.empty(simulation_length, dtype=object) # observations
     X_true = np.empty_like(Y) # real state of the system
     alpha_vec = np.empty(2) # forward variables
@@ -27,14 +45,11 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, loc_aw
     print(f"Number of sensors: {local_params.m}")
     # initialize the first values of the simulation
     X_true[0] = hmm.hidden_state
-    Y[0] = hmm.hidden_state
-    cond_prob0 = hmm.B[0, Y[0]]
-    cond_prob1 = hmm.B[1, Y[0]]
-    alpha_vec[0] = hmm.pi[0] * cond_prob0
-    alpha_vec[1] = hmm.pi[1] * cond_prob1
+    Y[0] = int(rng.choice(local_params.Y_symbols, p=hmm.B[X_true[0]])) # initialize first received symbol
+    cond_prob_vec = hmm.B[:, Y[0]]
+    alpha_vec = hmm.pi * cond_prob_vec
     cs[0] = 1
-    cumulative_cs_prod = cs[0]
-    pred_X[0] = np.argmax(alpha_vec/cumulative_cs_prod)
+    pred_X[0] = np.argmax(alpha_vec)
 
     # Viterbi algorithm initialization
     X_path = np.empty_like(Y, dtype=int) # state sequence
@@ -48,19 +63,17 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, loc_aw
         Y[t] = hmm.step()
         X_true[t] = hmm.hidden_state
 
-        temp0, temp1 = 0, 0
-        for id in range(2): # only two states
-            temp0 += alpha_vec[id] * hmm.A[id, 0]
-            temp1 += alpha_vec[id] * hmm.A[id, 1]
-        alpha_vec[0] = temp0 * hmm.B[0, Y[t]]
-        alpha_vec[1] = temp1 * hmm.B[1, Y[t]]
+        temp_vec = np.zeros(len(local_params.X_symbols))
+        for id in range(len(local_params.X_symbols)): # only two states
+            temp_vec[id] = np.sum(alpha_vec * hmm.A[:,id])
+        alpha_vec = temp_vec * hmm.B[:, Y[t]]
         cs[t] = np.sum(alpha_vec)
         alpha_vec /= cs[t] # normalize the forward probabilities
 
-        p_0_y_norm = alpha_vec[0] / np.sum(alpha_vec)
-        p_1_y_norm = alpha_vec[1] / np.sum(alpha_vec)
-        entropies[t] = - p_0_y_norm * np.log2(p_0_y_norm+1e-12) - p_1_y_norm * np.log2(p_1_y_norm+1e-12)
-        pred_X[t] = np.argmax(np.array(p_0_y_norm, p_1_y_norm))
+        p_x_y_norm = alpha_vec / np.sum(alpha_vec)
+        entropy = - np.sum(p_x_y_norm * np.log2(p_x_y_norm+1e-12))
+        entropies[t] = entropy
+        pred_X = np.argmax(p_x_y_norm)
 
         # viterbi algorithm recursion step
         for j in local_params.X_symbols:
@@ -78,7 +91,7 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, loc_aw
     estimation_error_prob = np.sum(np.abs(X_path - X_true)) / simulation_length
     short_est_prob = np.sum(np.abs(X_path - X_true)) / simulation_length
 
-    return entropies, np.mean(entropies), estimation_error_prob, short_est_prob
+    return entropies, np.mean(entropies), estimation_error_prob, short_est_prob, Y
 
 
 def run_hmm_simulation(params: SimulationParameters,
@@ -96,28 +109,30 @@ def run_hmm_simulation(params: SimulationParameters,
     else:
         simulation_seed, hmm_seed, node_dist_seed = seed, seed, seed
 
-
-    # 1. Initialize HMM Source
     local_params:SimulationParameters = copy.deepcopy(params)
     local_params.beta = 0
-    if not loc_aware and not non_binary:
-        local_params.Y_symbols = [0, 1, 2, 3]
-        hmm = HiddenMM(local_params, hmm_seed)
-    elif non_binary and not loc_aware:
-        hmm = HiddenMM(local_params, hmm_seed)
-    else:
-        hmm = SpatialHMM(local_params, hmm_seed)
-
     # 2. Initialize Node Distribution
     node_dist = NodeDistribution(rho=local_params.rho,
                                  unit_radius=local_params.R_unit,
                                  K=local_params.K,
                                  zeta = local_params.zeta,
                                  alpha=local_params.alpha,
-                                 beta=local_params.beta,
                                  seed=int(node_dist_seed),
                                  zeta_bucket=True,
                                  fixed_nodes_per_region=fixed_nodes_per_region)
+
+    # 1. Initialize HMM Source
+    if not loc_aware and not non_binary: # normal operation
+        assert len(local_params.X_symbols) == 2
+        assert len(local_params.Y_symbols) == 3
+        hmm = HiddenMM(local_params, node_dist.tx_prob_bucket, hmm_seed)
+    elif non_binary and not loc_aware:
+        hmm = HiddenMM(local_params, node_dist.tx_prob_bucket, hmm_seed)
+    elif not non_binary and loc_aware:
+        hmm = SpatialHMM(local_params, node_dist.tx_prob_bucket, hmm_seed)
+    else:
+        raise NotImplementedError("The combination of flags is not yet implemented.")
+
 
     num_nodes = len(node_dist)
     if local_params.m_override is not None:
@@ -207,7 +222,7 @@ def run_hmm_simulation(params: SimulationParameters,
             last_received_y = current_y
         else:
             if loc_aware:
-                last_received_y = 2 * local_params.K + 1
+                last_received_y = 2 * local_params.K 
             else:
                 last_received_y = local_params.Y_symbols[-1]
 
