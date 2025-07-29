@@ -51,7 +51,7 @@ def cond_prob_y_given_x_spatial(y, x, zeta, epsilon, m:int, K:int, lambda_mat:np
         return total
     if valued_symbol >= x_states_cardinality:
         return 1 - ps
-    raise NotImplementedError
+    raise ValueError(f"The value y = {y} is not valid for building a non spatial-aware model.")
 
 
 @jit

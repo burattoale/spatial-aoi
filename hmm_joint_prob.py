@@ -7,7 +7,7 @@ from tqdm import tqdm
 from environment import HiddenMM, SpatialHMM
 from environment import NodeDistribution, Node
 from utils import SimulationParameters
-from utils import cond_prob_y_given_x, sequence_entropy
+from utils import generate_lambda_matrix
 
 def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, seed=None, loc_aware=False, non_binary=False):
     # initialize rng and copy parameters to avoid unwanted side-effects
@@ -30,7 +30,7 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, seed=N
         hmm = HiddenMM(local_params, node_dist.tx_prob_bucket, seed)
     elif non_binary and not loc_aware:
         hmm = HiddenMM(local_params, node_dist.tx_prob_bucket, seed)
-    elif not non_binary and loc_aware:
+    elif loc_aware:
         hmm = SpatialHMM(local_params, node_dist.tx_prob_bucket, seed)
     else:
         raise NotImplementedError("The combination of flags is not yet implemented.")
@@ -128,11 +128,10 @@ def run_hmm_simulation(params: SimulationParameters,
         hmm = HiddenMM(local_params, node_dist.tx_prob_bucket, hmm_seed)
     elif non_binary and not loc_aware:
         hmm = HiddenMM(local_params, node_dist.tx_prob_bucket, hmm_seed)
-    elif not non_binary and loc_aware:
+    elif loc_aware:
         hmm = SpatialHMM(local_params, node_dist.tx_prob_bucket, hmm_seed)
     else:
         raise NotImplementedError("The combination of flags is not yet implemented.")
-
 
     num_nodes = len(node_dist)
     if local_params.m_override is not None:
@@ -154,6 +153,9 @@ def run_hmm_simulation(params: SimulationParameters,
     #     print(f"Nodes per region: {node_dist.nodes_per_region}")
     #     print(f"Total number of fixed nodes: {np.sum(node_dist.nodes_per_region)}")
 
+    # create the reading confusion matrix
+    lambda_mat = hmm.lambda_mat
+
     # 3. Initialize Receiver State
     X_true = np.empty(num_time_steps, dtype=int)
     Y = np.empty(num_time_steps, dtype=int)
@@ -168,7 +170,7 @@ def run_hmm_simulation(params: SimulationParameters,
     num_valid_steps_for_avg = 0
 
     # extract features from nodes
-    nodes_lam = np.array([node.lam for node in node_dist.nodes])
+    # nodes_lam = np.array([node.lam for node in node_dist.nodes])
     nodes_zeta = np.array([node.zeta for node in node_dist.nodes])
     prob_nodes_attempts_and_succeed_tx = nodes_zeta * (1 - local_params.epsilon)
 
@@ -188,6 +190,7 @@ def run_hmm_simulation(params: SimulationParameters,
         psi_matrix[0][x] = 0
 
     # Simulation loop
+    #counter = 0
     for t in range(1, num_time_steps):
         # A. Source Evolution
         hmm.step()
@@ -195,16 +198,8 @@ def run_hmm_simulation(params: SimulationParameters,
         current_x_source_state = hmm.hidden_state
 
         # B. Node Observation and Transmission
-        rand_perception = rng.random(num_nodes)
+        # TODO this is wrong for more than 2 states in the original chain
         rand_tx = rng.random(num_nodes)
-        perc_correct = current_x_source_state
-        perc_not_correct = 1 - current_x_source_state
-
-        nodes_perception = np.where(
-            rand_perception < nodes_lam,
-            perc_correct,
-            perc_not_correct
-        )
 
         tx_mask = rand_tx < prob_nodes_attempts_and_succeed_tx
         tx_idx = np.nonzero(tx_mask)[0]
@@ -212,29 +207,33 @@ def run_hmm_simulation(params: SimulationParameters,
 
         if num_succ_tx == 1:
             successful_node_id = tx_idx[0]
-            successul_node:Node = node_dist[successful_node_id]
+            successful_node:Node = node_dist[successful_node_id]
+            node_perception = rng.choice(local_params.X_symbols, p=lambda_mat[current_x_source_state, :, successful_node.zone_idx])
             # the symbol is the node zone if symbol is 0 
             # and K + node's zone if symbol is 1
             if loc_aware:
-                current_y = nodes_perception[successful_node_id] * local_params.K + successul_node.zone_idx
+                current_y = node_perception * local_params.K + successful_node.zone_idx
             else:
-                current_y = nodes_perception[successful_node_id]
+                current_y = node_perception
             last_received_y = current_y
         else:
-            if loc_aware:
-                last_received_y = 2 * local_params.K 
-            else:
-                last_received_y = local_params.Y_symbols[-1]
+            last_received_y = local_params.Y_symbols[-1] # take the ? symbol
+            #counter += 1
 
         # D. Entropy Contribution
         Y[t] = last_received_y
         # compute entropy
         temp_vec = np.zeros(len(local_params.X_symbols))
-        for id in range(len(local_params.X_symbols)): # only two states
+        for id in range(len(local_params.X_symbols)):
             temp_vec[id] = np.sum(alpha_vec * hmm.A[:,id])
         alpha_vec = temp_vec * hmm.B[:, Y[t]]
         cs[t] = np.sum(alpha_vec)
         alpha_vec /= cs[t] # normalize the forward probabilities
+        #if num_succ_tx == 1:
+            #print(last_received_y)
+            #p_x_y_norm = alpha_vec / np.sum(alpha_vec)
+            #print(p_x_y_norm)
+           # print(- np.sum(p_x_y_norm * np.log2(p_x_y_norm+1e-12)))
 
         p_x_y_norm = alpha_vec / np.sum(alpha_vec)
         entropy = - np.sum(p_x_y_norm * np.log2(p_x_y_norm+1e-12))
@@ -272,6 +271,7 @@ def run_hmm_simulation(params: SimulationParameters,
         entropy_evolution = [h_source_fallback] # or empty list, depends on desired plot behavior
         estimated_avg_entropy = h_source_fallback # Or NaN, or 0.0
         print("Warning: No valid steps for entropy averaging after burn-in.")
+    #print(f"I got the ? symbol {counter} times")
 
     return entropy_evolution, estimated_avg_entropy, estimation_error_prob, short_est_prob, Y
 

@@ -39,10 +39,12 @@ class HiddenMM(object):
     def __init__(self, params:SimulationParameters, tx_prob_per_bucket:np.ndarray, seed=None):
         self._params = params
         assert len(self._params.X_symbols) <= len(self._params.Y_symbols)
-        self.lambda_mat = generate_lambda_matrix(len(self._params.X_symbols),
+        self._lambda_mat = generate_lambda_matrix(len(self._params.X_symbols),
                                                   self._params.K,
                                                   self._params.alpha,
-                                                  self._params.R_unit)
+                                                  self._params.R_unit,
+                                                  noise_distribution = self._params.noise_distribution,
+                                                  base_sigma = self._params.base_sigma)
         self.tx_prob_per_bucket = tx_prob_per_bucket
         self.p_d_vector = np.array([(2 * d + 1) / (self._params.K**2) for d in range(self._params.K)])
         self.rng = np.random.default_rng(seed)
@@ -50,7 +52,6 @@ class HiddenMM(object):
                             [self._params.eta * self._params.q, 1 - self._params.eta * self._params.q]])
         if len(self._params.X_symbols) > 2:
             self._A = self._build_tranmission_matrix()
-            print(self._A)
         self._steady_state = _compute_steady_state(self._A)
         self._emission_matrix = self._fill_emission_matrix()
         self._emission_matrix = np.clip(self._emission_matrix, 0, 1)
@@ -80,6 +81,10 @@ class HiddenMM(object):
     def hidden_state(self):
         return self._hidden_state
     
+    @property
+    def lambda_mat(self):
+        return self._lambda_mat
+    
     def step(self):
         next_hidden_state = self.rng.choice(self._params.X_symbols, p=self.A[int(self._hidden_state)])
         self._hidden_state = next_hidden_state
@@ -104,7 +109,7 @@ class HiddenMM(object):
                                           self._params.epsilon,
                                           self._params.m,
                                           self._params.K,
-                                          self.lambda_mat,
+                                          self._lambda_mat,
                                           self.tx_prob_per_bucket,
                                           self.p_d_vector,
                                           x_states_cardinality=states_cardinality,
@@ -159,11 +164,10 @@ class SpatialHMM(HiddenMM):
                                           self._params.epsilon,
                                           self._params.m,
                                           self._params.K,
-                                          self.lambda_mat,
+                                          self._lambda_mat,
                                           self.tx_prob_per_bucket,
                                           self.p_d_vector,
                                           x_states_cardinality=states_cardinality,
                                           poibin=use_poibin,
                                           p_succ=p_succ)
-
         return B

@@ -19,6 +19,8 @@ class SimulationParameters(object):
     alpha: float = 2.0 # Power law exponent for node correctness & entropy calc
     beta: float = 2.0 # Power law exponent for node transmission probability
     R_unit: float = 1.0  # Unit radius for circle sections (was R in original, renamed for clarity)
+    noise_distribution:str = "uniform"
+    base_sigma:float = 1
     
     # Default X_symbols and Y_symbols for binary case
     X_symbols: List[Any] = None # Will be [0, 1]
