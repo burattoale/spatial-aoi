@@ -22,11 +22,11 @@ def generate_lambda_matrix(num_x_symbols:int, K:int, alpha:float, R_unit:float, 
                     else:
                         out[i, j, d] = other_lam_val
         elif noise_distribution == "gaussian":
-            sigma = _compute_sigma(base_sigma, d)
+            sigma = _compute_sigma(lam_val)
             domain = np.arange(0, num_x_symbols)
             # create rows and fill the matrix
             for i in range(shape[0]):
-                out[i, :, d] = _gaussian_split_with_center_non_symmetric(domain, center_value=i, sigma=sigma, lambd=lam_val)
+                out[i, :, d] = _gaussian_split_with_center_non_symmetric(domain, center_value=i, sigma=sigma)
         elif noise_distribution == "diagonal":
             out[:, :, d] = np.eye(shape[0], shape[1])
         elif noise_distribution == "partial_uniform":
@@ -36,31 +36,40 @@ def generate_lambda_matrix(num_x_symbols:int, K:int, alpha:float, R_unit:float, 
             raise NotImplementedError("The method only supports uniform distribution for the other lambdas")
     return out
 
-def _gaussian_split_with_center_non_symmetric(domain:np.ndarray, center_value:int, sigma:float, lambd:float) -> np.ndarray:
+def _gaussian_split_with_center_non_symmetric(domain:np.ndarray, center_value:int, sigma:float) -> np.ndarray:
     # Find the index of the center value in the domain
     center_index = np.where(domain == center_value)[0][0]
+
+    if np.isclose(sigma, 0):
+        out = np.zeros(len(domain))
+        out[center_index] = 1
+        return out
     
     # Calculate Gaussian values for all points relative to the chosen center
     distances = domain - domain[center_index]
     gaussian_vals = np.exp(- (distances**2) / (2 * sigma**2))
 
     # Remove center point for normalization of the rest
-    gaussian_vals_without_center = np.delete(gaussian_vals, center_index)
+    #gaussian_vals_without_center = np.delete(gaussian_vals, center_index)
     
     # Normalize the rest so sum to 1
-    gaussian_rest_norm = gaussian_vals_without_center / gaussian_vals_without_center.sum()
+    gaussian_rest_norm = gaussian_vals/ np.sum(gaussian_vals)#gaussian_vals_without_center / gaussian_vals_without_center.sum()
 
     # Allocate probabilities
-    probs = np.zeros_like(domain, dtype=float)
-    probs[center_index] = lambd
-    # Assign the rest with scaled gaussian values
-    rest_indices = np.arange(len(domain)) != center_index
-    probs[rest_indices] = (1 - lambd) * gaussian_rest_norm
+    # probs = np.zeros_like(domain, dtype=float)
+    # probs[center_index] = lambd
+    # # Assign the rest with scaled gaussian values
+    # rest_indices = np.arange(len(domain)) != center_index
+    # probs[rest_indices] = (1 - lambd) * gaussian_rest_norm
+    probs = gaussian_rest_norm
     
     return probs
 
-def _compute_sigma(base_sigma:float, zone_idx:int) -> np.ndarray:
-    return base_sigma
+def _compute_sigma(lam_val:float) -> np.ndarray:
+    if np.isclose(lam_val, 1):
+        return 0
+    sigma = np.sqrt(1/2*1/np.log(lam_val/(1-lam_val)))
+    return sigma
 
 def distribute_probability(num_symbols:int, central_index:int, lambda_val:float, num_neighbors:int):
     """
