@@ -1,0 +1,21 @@
+{
+    "q":0.005,
+    "eta":1,
+    "zeta":5e-4,
+    "epsilon":0.1,
+    "rho":0.05,
+    "alpha":0.02,
+    "beta":0,
+    "R_unit":5,
+    "X_symbols": [0,1,2,3,4],
+    "noise_distribution": "gaussian",
+
+    "K_range": [1, 70],
+    "eta_range": [1, 30],
+
+    "num_simulations":100,
+    "num_steps":100000,
+
+    "loc_aware":false,
+    "output_file": "results/five_source.pkl"
+}
