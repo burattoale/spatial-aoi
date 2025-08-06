@@ -74,7 +74,7 @@ def prob_x_given_y_delta(p_x_given_y_0_vec:np.ndarray, A_delta_power:np.ndarray)
     # Ensure p_x_given_y_0_vec is a 1D array for consistent matrix multiplication result
     return np.dot(p_x_given_y_0_vec.flatten(), A_delta_power)
 
-@jit
+#@jit
 def h_y_delta(p_x_given_y_0_vec:np.ndarray, A_delta_power:np.ndarray, x_symbols=None):
     # Calculates H(X_delta | Y_0)
     if x_symbols is None:

@@ -16,7 +16,7 @@ colors = [
     "tab:cyan"
 ]
 R_unit = 5
-with open("results/binary_simulations_eta_R_unit_5.pkl", 'rb') as f:
+with open("results/binary_simulations_eta_R_unit_5_special.pkl", 'rb') as f:
     data_eta = pickle.load(f)
 
 # plot the evolution with gowing number of sections
@@ -42,6 +42,22 @@ plt.ylabel(r"Average estimation entropy")
 plt.legend(ncols=2)
 plt.subplots_adjust(left=0.15)
 plt.xlim(left=1)
+plt.show()
+
+plt.figure(10)
+err_eta_1 = data_eta["hmm_err"]["eta:1"]
+err_eta_5 = data_eta["hmm_err"]["eta:5"]
+err_eta_9 = data_eta["hmm_err"]["eta:9"]
+err_eta_25 = data_eta["hmm_err"]["eta:25"]
+
+plt.semilogy(np.array(list(err_eta_1.keys())) * R_unit, err_eta_1.values(), color=colors[0], marker='.', markevery=4, label=r"$\eta=1$, HMM")
+plt.semilogy(np.array(list(err_eta_5.keys())) * R_unit, err_eta_5.values(), color=colors[1], marker='d', markevery=4, label=r"$\eta=5$, HMM")
+plt.semilogy(np.array(list(err_eta_9.keys())) * R_unit, err_eta_9.values(), color=colors[2], marker='*', markevery=4, label=r"$\eta=9$, HMM")
+plt.semilogy(np.array(list(err_eta_25.keys())) * R_unit, err_eta_25.values(), color=colors[3], marker='x', markevery=4, label=r"$\eta=25$, HMM")
+plt.grid(which='both', color='grey', linestyle=':', linewidth=0.7)
+plt.legend()
+plt.xlabel(r"Coverage radius ($R$)")
+plt.ylabel(r"Average estimation error")
 plt.show()
 
 

@@ -10,11 +10,11 @@ from copy import deepcopy
 import pickle
 from tqdm import tqdm
 
-k_min = 1
+k_min = 2
 k_max = 60
-num_simulations = 40
+num_simulations = 5
 
-sim_length = 10000
+sim_length = 20000
 
 hmm_params = SimulationParameters(
         q=0.005,
@@ -33,25 +33,29 @@ hmm_params = SimulationParameters(
 results = {}
 results['hmm'] = {}
 results['forgetful'] = {}
-for eta in tqdm(range(1, 50,1)):
+results['hmm_err'] = {}
+for eta in tqdm([1,5,9,25]):#range(1, 50,1)):
     results['hmm'][f"eta:{eta}"] = {}
     results['forgetful'][f"eta:{eta}"] = {}
+    results['hmm_err'][f"eta:{eta}"] = {}
     hmm_params.eta = eta
-    for k in range(k_min, k_max):
+    for k in range(k_min, k_max,2):
         hmm_params.K = k
         hmm_params.m = math.floor(hmm_params.rho * np.pi * (hmm_params.R_unit*k)**2)
-        hmm_res = Parallel(n_jobs=10,)(
+        hmm_res = Parallel(n_jobs=5,)(
             delayed(run_hmm_simulation)(hmm_params, sim_length, seed=i) for i in range(num_simulations)
         )
         averages_hmm = [r[1] for r in hmm_res]
+        averages_hmm_est_error = [r[2] for r in hmm_res]
         results['hmm'][f"eta:{eta}"][k] = np.mean(averages_hmm)
+        results['hmm_err'][f"eta:{eta}"][k] = np.mean(averages_hmm_est_error)
         forgetful_params = deepcopy(hmm_params)
         forgetful_params.Y_symbols = [0,1]
-        forgetful_res = Parallel(n_jobs=10,)(
+        forgetful_res = Parallel(n_jobs=5,)(
             delayed(run_monte_carlo_simulation)(hmm_params, sim_length, 100, seed=i) for i in range(num_simulations)
         )
         averages_forgetful = [r[1] for r in forgetful_res]
         results['forgetful'][f"eta:{eta}"][k] = np.mean(averages_forgetful)
         # save
-        with open("results/binary_simulations_eta_R_unit_5.pkl", 'wb') as f:
+        with open("results/binary_simulations_eta_R_unit_5_special.pkl", 'wb') as f:
             pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
