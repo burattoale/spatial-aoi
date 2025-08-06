@@ -50,12 +50,12 @@ if __name__ == "__main__":
     results['hmm'] = {}
     results['forgetful'] = {}
     results['hmm_err'] = {}
-    for eta in tqdm(range(eta_min, eta_max)):#range(1, 50,1)):
+    for eta in tqdm([1,5,9,25]):#range(1, 50,1)):
         results['hmm'][f"eta:{eta}"] = {}
         results['forgetful'][f"eta:{eta}"] = {}
         results['hmm_err'][f"eta:{eta}"] = {}
         hmm_params.eta = eta
-        for k in range(k_min, k_max):
+        for k in range(10,50):
             hmm_params.K = k
             hmm_params.m = math.floor(hmm_params.rho * np.pi * (hmm_params.R_unit*k)**2)
             if LOC_AWARE:
