@@ -24,7 +24,8 @@ run_with_lock(){
     )&
 }
 
-env=gt
+env=aoi
+# path to the python interpreter in the conda environment
 pydir=/nfsd/signet4/burattoale/miniconda3/envs/$env/bin
 
 
@@ -33,8 +34,7 @@ echo "Running binary exponential simulations"
 n_paral=2
 open_sem $n_paral
 # main loop for starting simulations
-for N in $(seq 10 25)
-do
-	echo "Running for $N"
-	run_with_lock $pydir/python src/binary_exponential_backoff.py -N $N
+for i in experiments/*.json; do
+    echo "Running $i"
+    run_with_lock $pydir/python runner.py --config $i
 done

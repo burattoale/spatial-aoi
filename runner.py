@@ -44,6 +44,8 @@ if __name__ == "__main__":
     NON_BINARY = True if len(hmm_params.X_symbols) > 2 else False
     LOC_AWARE = configs["loc_aware"]
 
+    PARALLEL_JOBS = 10
+
     results = {}
     results['hmm'] = {}
     results['forgetful'] = {}
@@ -61,7 +63,7 @@ if __name__ == "__main__":
             else:
                 hmm_params.Y_symbols = deepcopy(hmm_params.X_symbols)
                 hmm_params.Y_symbols.append(len(hmm_params.X_symbols)) # add no receive symbol
-            hmm_res = Parallel(n_jobs=5,)(
+            hmm_res = Parallel(n_jobs=PARALLEL_JOBS,)(
                 delayed(run_hmm_simulation)(hmm_params, sim_length, seed=i, loc_aware=LOC_AWARE, non_binary=NON_BINARY) for i in range(num_simulations)
             )
             averages_hmm = [r[1] for r in hmm_res]
@@ -73,7 +75,7 @@ if __name__ == "__main__":
             if not LOC_AWARE and not NON_BINARY:
                 forgetful_params = deepcopy(hmm_params)
                 forgetful_params.Y_symbols = deepcopy(forgetful_params.X_symbols)
-                forgetful_res = Parallel(n_jobs=5,)(
+                forgetful_res = Parallel(n_jobs=PARALLEL_JOBS,)(
                     delayed(run_monte_carlo_simulation)(forgetful_params, sim_length, 100, seed=i) for i in range(num_simulations)
                 )
                 averages_forgetful = [r[1] for r in forgetful_res]
