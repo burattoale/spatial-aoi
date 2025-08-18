@@ -34,8 +34,12 @@ echo "Running binary exponential simulations"
 n_paral=2
 open_sem $n_paral
 # main loop for starting simulations
-for i in experiments/*.json; do
-    echo "Running $i"
-    run_with_lock $pydir/python runner.py --config $i
+files=(
+    experiments/binary.json
+    experiments/binary_loc_aware.json
+)
+for file in "${files[@]}"; do
+    echo "Running $file"
+    run_with_lock $pydir/python runner.py --config $file --alpha_sweep true
 done
 wait

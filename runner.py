@@ -16,6 +16,7 @@ from joblib import Parallel, delayed
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the main script with specified arguments.")
     parser.add_argument("--config", type=str, required=True, help="Path to the configuration file.")
+    parser.add_argument("--alpha_sweep", type=bool, default=False, help="Alpha parameter for the simulation.")
     
     args = parser.parse_args()
 
@@ -50,10 +51,19 @@ if __name__ == "__main__":
     results['hmm'] = {}
     results['forgetful'] = {}
     results['hmm_err'] = {}
-    for eta in tqdm([1,5,9,25]):#range(1, 50,1)):
-        results['hmm'][f"eta:{eta}"] = {}
-        results['forgetful'][f"eta:{eta}"] = {}
-        results['hmm_err'][f"eta:{eta}"] = {}
+    eta_list = [1, 5, 9, 25]
+    if args.alpha_sweep:
+        eta_list = [0.02, 0.05, 0.1]
+    for eta in tqdm(eta_list):#range(1, 50,1)):
+        if args.alpha_sweep:
+            hmm_params.alpha = eta
+            results['hmm'][f"alpha:{eta}"] = {}
+            results['forgetful'][f"alpha:{eta}"] = {}
+            results['hmm_err'][f"alpha:{eta}"] = {}
+        else:
+            results['hmm'][f"eta:{eta}"] = {}
+            results['forgetful'][f"eta:{eta}"] = {}
+            results['hmm_err'][f"eta:{eta}"] = {}
         hmm_params.eta = eta
         for k in range(10,50):
             hmm_params.K = k
@@ -68,8 +78,12 @@ if __name__ == "__main__":
             )
             averages_hmm = [r[1] for r in hmm_res]
             averages_hmm_est_error = [r[2] for r in hmm_res]
-            results['hmm'][f"eta:{eta}"][k] = np.mean(averages_hmm)
-            results['hmm_err'][f"eta:{eta}"][k] = np.mean(averages_hmm_est_error)
+            if args.alpha_sweep:
+                results['hmm'][f"alpha:{eta}"][k] = np.mean(averages_hmm)
+                results['hmm_err'][f"alpha:{eta}"][k] = np.mean(averages_hmm_est_error)
+            else:
+                results['hmm'][f"eta:{eta}"][k] = np.mean(averages_hmm)
+                results['hmm_err'][f"eta:{eta}"][k] = np.mean(averages_hmm_est_error)
             # forgetful
             # do not do the locaion aware stuff
             if not LOC_AWARE and not NON_BINARY:
@@ -79,7 +93,15 @@ if __name__ == "__main__":
                     delayed(run_monte_carlo_simulation)(forgetful_params, sim_length, 100, seed=i) for i in range(num_simulations)
                 )
                 averages_forgetful = [r[1] for r in forgetful_res]
-                results['forgetful'][f"eta:{eta}"][k] = np.mean(averages_forgetful)
+                if args.alpha_sweep:
+                    results['forgetful'][f"alpha:{eta}"][k] = np.mean(averages_forgetful)
+                else:
+                    results['forgetful'][f"eta:{eta}"][k] = np.mean(averages_forgetful)
             # save
-            with open(configs["output_file"], 'wb') as f:
+            # if alpha sweep modify the file name to have a trailing _alpha still reading from the configs
+            if args.alpha_sweep:
+                output_file = configs["output_file"].replace(".pkl", f"_alpha.pkl")
+            else:
+                output_file = configs["output_file"]
+            with open(output_file, 'wb') as f:
                 pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
