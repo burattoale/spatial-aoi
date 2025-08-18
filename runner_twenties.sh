@@ -42,3 +42,4 @@ for i in "${twenties[@]}"; do
     echo "Running $i"
     run_with_lock $pydir/python runner.py --config $i
 done
+wait
