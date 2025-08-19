@@ -54,6 +54,7 @@ if __name__ == "__main__":
     eta_list = [1, 5, 9, 25]
     if args.alpha_sweep:
         eta_list = [0.02, 0.05, 0.1]
+        print("Running alpha sweep")
     for eta in tqdm(eta_list):#range(1, 50,1)):
         if args.alpha_sweep:
             hmm_params.alpha = eta
@@ -61,10 +62,10 @@ if __name__ == "__main__":
             results['forgetful'][f"alpha:{eta}"] = {}
             results['hmm_err'][f"alpha:{eta}"] = {}
         else:
+            hmm_params.eta = eta
             results['hmm'][f"eta:{eta}"] = {}
             results['forgetful'][f"eta:{eta}"] = {}
             results['hmm_err'][f"eta:{eta}"] = {}
-        hmm_params.eta = eta
         for k in range(10,50):
             hmm_params.K = k
             hmm_params.m = math.floor(hmm_params.rho * np.pi * (hmm_params.R_unit*k)**2)
