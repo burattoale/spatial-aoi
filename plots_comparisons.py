@@ -22,7 +22,7 @@ initial_params = SimulationParameters(
         R_unit=10,
         Y_symbols=[0,1,2]
     )
-sim_length = 20000
+sim_length = 100000
 avg_bin = []
 avg_tri = []
 avg_quad = []
@@ -45,7 +45,7 @@ for k in tqdm(range(5,20)):
     temp_tri_loc = []
     temp_quad = []
     temp_quad_loc = []
-    for i in range(30):
+    for i in range(1):
         _, avg_entropy_bin, _, _, _ = run_hmm_simulation(params_bin, sim_length, seed=i, non_binary=False)
         params_bin_loc = deepcopy(params_bin)
         params_bin_loc.Y_symbols = [i for i in range(params_bin.K * 2 +1)]
