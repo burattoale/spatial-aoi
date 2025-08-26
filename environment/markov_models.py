@@ -125,15 +125,15 @@ class HiddenMM(object):
         for i in range(shape[0]):
             for j in range(shape[1]):
                 if i == j:
-                    A[i, j] = 1 - 2 * self._params.q
+                    A[i, j] = 1 - (1+self._params.eta)* self._params.q
                 elif j == i + 1:
                     A[i, j] = self._params.q
                 elif j == i - 1:
-                    A[i, j] = self._params.q
+                    A[i, j] = self._params.q * self._params.eta
                 else:
                     continue
         A[0, 0] = 1 - self._params.q
-        A[-1, -1] = 1 - self._params.q
+        A[-1, -1] = 1 - self._params.q * self._params.eta
         return A
     
 

@@ -178,3 +178,8 @@ results
 *.prof
 *.pkl
 .idea/
+
+# tikz plots
+tikz_data/
+tikz_base/
+tikz_figures/
