@@ -42,6 +42,7 @@ plt.ylabel(r"Average estimation entropy")
 plt.legend(ncols=2)
 plt.subplots_adjust(left=0.15)
 plt.xlim(left=1)
+plt.savefig("final_plots/figure_0.png")
 plt.show()
 
 # Tikz generation for Figure 0
@@ -92,6 +93,7 @@ plt.xlabel(r"Coverage radius ($R$)")
 plt.ylabel(r"Average estimation entropy")
 plt.legend()
 plt.xlim(left=1)
+plt.savefig("final_plots/figure_100.png")
 plt.show()
 generate_tex_file("fig100_H_vs_R_sources", r"Coverage radius ($R$)", r"Average estimation entropy", plots_fig100, ymode='log', legend_at='(1,0)', legend_anchor='south east', xmin=0)
 
@@ -129,6 +131,7 @@ plt.ylabel(r"Average estimation entropy")
 plt.legend(ncols=2)
 plt.subplots_adjust(left=0.15)
 plt.xlim(left=1)
+plt.savefig("final_plots/figure_4.png")
 plt.show()
 generate_tex_file("fig4_H_vs_R_alphas", r"Coverage radius ($R$)", r"Average estimation entropy", plots_fig4, ymode='log', legend_at='(1,0)', legend_anchor='south east', xmin=0)
 
@@ -148,6 +151,7 @@ plt.grid(which='both', color='grey', linestyle=':', linewidth=0.7)
 plt.legend()
 plt.xlabel(r"Coverage radius ($R$)")
 plt.ylabel(r"Average estimation error")
+plt.savefig("final_plots/figure_10.png")
 plt.show()
 
 plots_fig10 = [
@@ -181,7 +185,9 @@ plt.ylabel(r"Optimal coverage radius ($R^*$)")
 plt.xlim(left=1)
 plt.legend()
 plt.grid(which='both', color='grey', linestyle=':', linewidth=0.7)
+plt.savefig("final_plots/figure_1.png")
 plt.show()
+
 
 plots_fig1 = [
     {'data_file': 'fig1_forgetful_optimal_R.txt', 'legend_entry': 'Forgetful'},
@@ -200,7 +206,9 @@ plt.ylabel(r"Minimum entropy ($H^*$)")
 plt.grid(which='both', color='grey', linestyle=':', linewidth=0.7)
 plt.legend()
 plt.xlim(left=1)
+plt.savefig("final_plots/figure_2.png")
 plt.show()
+
 
 plots_fig2 = [
     {'data_file': 'fig2_forgetful_optimal_H.txt', 'legend_entry': 'Forgetful'},
@@ -235,7 +243,9 @@ plt.xlabel(r"Coverage radius ($R$)")
 plt.ylabel(r"Average estimation entropy")
 plt.legend(ncols=2)
 plt.xlim(left=1)
+plt.savefig("final_plots/figure_3.png")
 plt.show()
+
 
 plots_fig3 = [
     {'data_file': 'fig3_forgetful.txt', 'legend_entry': 'Forgetful'},
@@ -265,7 +275,7 @@ save_to_file(np.array(list(eta_9.keys())) * R_unit, list(eta_9.values()), "fig0_
 save_to_file(np.array(list(hmm_eta_1.keys())) * R_unit, list(hmm_eta_1.values()), "fig0_hmm_eta1.txt", r"$\eta=1$, HMM")
 save_to_file(np.array(list(hmm_eta_5.keys())) * R_unit, list(hmm_eta_5.values()), "fig0_hmm_eta5.txt", r"$\eta=5$, HMM")
 save_to_file(np.array(list(hmm_eta_9.keys())) * R_unit, list(hmm_eta_9.values()), "fig0_hmm_eta9.txt", r"$\eta=9$, HMM")
-generate_tex_file("fig0_H_vs_R_etas", r"Coverage radius ($R$)", r"Average estimation entropy", plots_fig0, ymode='log', legend_pos='south east', xmin=0)
+generate_tex_file("fig0_H_vs_R_etas", r"Coverage radius ($R$)", r"Average estimation entropy", plots_fig0, ymode='log', xmin=0)
 
 # Plot for eta:1 with different number of sources
 plt.figure(100)
@@ -300,4 +310,84 @@ plt.xlabel(r"Coverage radius ($R$)")
 plt.ylabel(r"Average estimation entropy")
 plt.legend()
 plt.xlim(left=1)
+plt.show()
+
+# --- New Figure: Multiple eta for multi-symbol sources ---
+plt.figure(101)
+multi_eta_values = ["eta:1", "eta:5", "eta:9"]
+multi_source_counts = ["three", "five", "seven", "ten"]  # Exclude binary for clarity
+for idx, n_sources in enumerate(multi_source_counts):
+    with open(f"results/{n_sources}_source.pkl", 'rb') as f:
+        data_multi = pickle.load(f)
+    for jdx, eta_val in enumerate(multi_eta_values):
+        if eta_val in data_multi["hmm"]:
+            hmm_multi = data_multi["hmm"][eta_val]
+            x_vals = np.array(list(hmm_multi.keys())) * R_unit
+            y_vals = list(hmm_multi.values())
+            plt.semilogy(x_vals, y_vals,
+                         color=colors[idx], linestyle=['-', '--', ':'][jdx], marker=['x', 'o', 's'][jdx], markevery=4,
+                         label=f"{n_sources} sources, {eta_val}")
+plt.grid(which='both', color='grey', linestyle=':', linewidth=0.7)
+plt.xlabel(r"Coverage radius ($R$)")
+plt.ylabel(r"Average estimation entropy")
+plt.legend()
+plt.xlim(left=1)
+plt.title("Multi-symbol sources: Multiple $\eta$")
+plt.savefig("final_plots/figure_101.png")
+plt.show()
+
+# --- New Figure: Minimum entropy vs eta for multi-symbol sources ---
+plt.figure(102)
+multi_source_counts = ["three", "five", "seven", "ten"]
+multi_eta_values = ["eta:1", "eta:5", "eta:9"]
+eta_numeric = [1, 5, 9]
+for idx, n_sources in enumerate(multi_source_counts):
+    min_entropies = []
+    for eta_val in multi_eta_values:
+        try:
+            with open(f"results/{n_sources}_source.pkl", 'rb') as f:
+                data_multi = pickle.load(f)
+            if eta_val in data_multi["hmm"]:
+                hmm_multi = data_multi["hmm"][eta_val]
+                min_entropies.append(np.min(list(hmm_multi.values())))
+            else:
+                min_entropies.append(np.nan)
+        except Exception:
+            min_entropies.append(np.nan)
+    plt.plot(eta_numeric, min_entropies, marker='.', label=f"{n_sources} sources")
+plt.xlabel(r"Asymmetry coefficient ($\eta$)")
+plt.ylabel(r"Minimum entropy ($H^*$)")
+plt.grid(which='both', color='grey', linestyle=':', linewidth=0.7)
+plt.legend()
+plt.xlim(left=1)
+plt.title("Minimum entropy vs $\eta$ for multi-symbol sources")
+plt.savefig("final_plots/figure_102.png")
+plt.show()
+
+# --- New Figure: Optimal coverage radius vs eta for multi-symbol sources ---
+plt.figure(103)
+for idx, n_sources in enumerate(multi_source_counts):
+    optimal_radii = []
+    for eta_val in multi_eta_values:
+        try:
+            with open(f"results/{n_sources}_source.pkl", 'rb') as f:
+                data_multi = pickle.load(f)
+            if eta_val in data_multi["hmm"]:
+                hmm_multi = data_multi["hmm"][eta_val]
+                values = list(hmm_multi.values())
+                keys = list(hmm_multi.keys())
+                min_idx = np.argmin(values)
+                optimal_radii.append(keys[min_idx] * R_unit)
+            else:
+                optimal_radii.append(np.nan)
+        except Exception:
+            optimal_radii.append(np.nan)
+    plt.plot(eta_numeric, optimal_radii, marker='.', label=f"{n_sources} sources")
+plt.xlabel(r"Asymmetry coefficient ($\eta$)")
+plt.ylabel(r"Optimal coverage radius ($R^*$)")
+plt.grid(which='both', color='grey', linestyle=':', linewidth=0.7)
+plt.legend()
+plt.xlim(left=1)
+plt.title("Optimal coverage radius vs $\eta$ for multi-symbol sources")
+plt.savefig("final_plots/figure_103.png")
 plt.show()
