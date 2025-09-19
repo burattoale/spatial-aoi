@@ -51,7 +51,7 @@ if __name__ == "__main__":
     results['hmm'] = {}
     results['forgetful'] = {}
     results['hmm_err'] = {}
-    eta_list = [1, 5, 9, 25]
+    eta_list = [1, 5]#[1, 5, 9, 25]
     if args.alpha_sweep:
         eta_list = [0.02, 0.05, 0.1]
         print("Running alpha sweep")
@@ -66,7 +66,7 @@ if __name__ == "__main__":
             results['hmm'][f"eta:{eta}"] = {}
             results['forgetful'][f"eta:{eta}"] = {}
             results['hmm_err'][f"eta:{eta}"] = {}
-        for k in range(10,50):
+        for k in range(k_min, k_max):
             hmm_params.K = k
             hmm_params.m = math.floor(hmm_params.rho * np.pi * (hmm_params.R_unit*k)**2)
             if LOC_AWARE:
