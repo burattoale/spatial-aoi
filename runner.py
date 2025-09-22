@@ -51,7 +51,7 @@ if __name__ == "__main__":
     results['hmm'] = {}
     results['forgetful'] = {}
     results['hmm_err'] = {}
-    eta_list = [1, 5]#[1, 5, 9, 25]
+    eta_list = range(eta_min, eta_max + 1)#[1, 5, 9, 25]
     if args.alpha_sweep:
         eta_list = [0.02, 0.05, 0.1]
         print("Running alpha sweep")
