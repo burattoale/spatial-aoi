@@ -16,6 +16,8 @@
     "num_simulations":80,
     "num_steps":30000,
 
+    "parallel_jobs":20,
+
     "loc_aware":false,
     "output_file": "results/binary_spawc.pkl"
 }

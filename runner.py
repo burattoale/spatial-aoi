@@ -45,7 +45,7 @@ if __name__ == "__main__":
     NON_BINARY = True if len(hmm_params.X_symbols) > 2 else False
     LOC_AWARE = configs["loc_aware"]
 
-    PARALLEL_JOBS = 10
+    PARALLEL_JOBS = configs.get("parallel_jobs", 10)
 
     results = {}
     results['hmm'] = {}
