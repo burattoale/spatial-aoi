@@ -13,8 +13,8 @@
     "K_range": [4, 65],
     "eta_range": [1, 30],
 
-    "num_simulations":80,
-    "num_steps":30000,
+    "num_simulations":50,
+    "num_steps":50000,
 
     "parallel_jobs":20,
 
