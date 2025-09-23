@@ -19,5 +19,5 @@
     "parallel_jobs":20,
 
     "loc_aware":false,
-    "output_file": "results/binary_spawc.pkl"
+    "output_file": "results/binary_spawc_extended.pkl"
 }
