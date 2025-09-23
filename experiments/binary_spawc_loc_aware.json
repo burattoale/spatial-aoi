@@ -18,6 +18,6 @@
 
     "parallel_jobs":10,
 
-    "loc_aware":false,
-    "output_file": "results/binary_spawc_extended.pkl"
+    "loc_aware":true,
+    "output_file": "results/binary_spawc_loc_aware.pkl"
 }
