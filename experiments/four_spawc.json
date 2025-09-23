@@ -7,7 +7,7 @@
     "alpha":0.02,
     "beta":0,
     "R_unit":10,
-    "X_symbols": [0,1],
+    "X_symbols": [0,1,2,3],
     "noise_distribution": "gaussian",
 
     "K_range": [4, 65],
@@ -19,5 +19,5 @@
     "parallel_jobs":10,
 
     "loc_aware":false,
-    "output_file": "results/binary_spawc.pkl"
+    "output_file": "results/four_spawc.pkl"
 }
