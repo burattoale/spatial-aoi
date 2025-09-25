@@ -7,6 +7,108 @@ from .forgetful_receiver_funcs import prob_x_given_y_0_spatial
 from .poibin import PoiBin
 from .matrix_builders import generate_lambda_matrix
 
+def run_monte_carlo_simulation_forced_sequence(params: SimulationParameters,
+                                             y_sequence: np.ndarray,
+                                             x_true_sequence: np.ndarray,
+                                             num_burn_in_steps: int = 0):
+    """
+    Runs the forgetful receiver simulation with a predefined Y sequence.
+    This allows comparison with HMM using identical observation sequences.
+    
+    Args:
+        params: SimulationParameters object
+        y_sequence: Array of received observations Y (forced sequence)
+        x_true_sequence: Array of true source states X (for reference)
+        num_burn_in_steps: Number of burn-in steps (default 0)
+    
+    Returns:
+        tuple: (estimated_avg_entropy, entropy_evolution, (y_sequence, x_true_sequence))
+    """
+    from environment import DTMC, NodeDistribution, Node
+    
+    num_time_steps = len(y_sequence)
+    
+    # 1. Initialize DTMC Source (for transition matrix)
+    dtmc = DTMC(q=params.q, eta=params.eta, seed=0)  # seed doesn't matter here
+    
+    # 2. Initialize Node Distribution (for lambda calculation)
+    node_dist = NodeDistribution(rho=params.rho,
+                                 unit_radius=params.R_unit,
+                                 K=params.K,
+                                 zeta=params.zeta,
+                                 alpha=params.alpha,
+                                 seed=0)  # seed doesn't matter here
+    
+    num_nodes = len(node_dist)
+    if params.m_override is not None:
+        num_nodes = params.m_override
+    
+    if num_nodes == 0:
+        print("Warning: No nodes in the system (m=0).")
+        pi_s = dtmc.pi
+        h_source = -np.sum(pi_s * np.log2(pi_s, where=pi_s > 0))
+        entropy_evolution = [h_source] * num_time_steps
+        return h_source, entropy_evolution, (y_sequence, x_true_sequence)
+
+    print(f"Forced sequence simulation started with {num_nodes} nodes.")
+    
+    # 3. Initialize Receiver State
+    current_aoi = 0
+    last_received_y = 0
+    
+    # Data collectors
+    entropy_evolution = np.empty(num_time_steps, dtype=float)
+    total_entropy_contribution = 0.0
+    num_valid_steps_for_avg = 0
+    
+    # Cache for transition matrix powers
+    matrix_power_cache = {}
+    matrix_power_cache[0] = np.eye(dtmc.A.shape[0])
+    matrix_power_cache[1] = dtmc.A.copy()
+    
+    lambda_mat = generate_lambda_matrix(len(params.X_symbols), params.K, params.alpha, params.R_unit)
+    p_d_vector = [(2 * d + 1) / (params.K**2) for d in range(params.K)]
+    p_d_vector = np.array(p_d_vector, dtype=float)
+    
+    # Process the forced sequence
+    for t in range(num_time_steps):
+        current_y = y_sequence[t]
+        
+        # Apply the same reception logic as the original function:
+        # Y=0 or Y=1 means successful reception (num_succ_tx == 1)
+        # Y=2 means collision/no reception (num_succ_tx != 1)
+        if current_y in [0, 1]:  # Successful reception
+            last_received_y = current_y
+            current_aoi = 0
+        else:  # Y=2 (collision/no reception)
+            current_aoi += 1
+        
+        # Calculate entropy (skip burn-in if specified)
+        if t >= num_burn_in_steps:
+            # P(X_0=x | Y_0=last_received_y) for x in [0, 1]
+            p_x_given_y0_at_reception_vec = np.array([
+                prob_x_given_y_0(x_val, last_received_y, dtmc.pi,
+                                 params.K, node_dist.tx_prob_bucket, lambda_mat, p_d_vector)
+                for x_val in params.X_symbols
+            ])
+            
+            if current_aoi not in matrix_power_cache:
+                matrix_power_cache[current_aoi] = np.linalg.matrix_power(dtmc.A, current_aoi)
+            A_aoi_pow = matrix_power_cache[current_aoi]
+            
+            # H(X_t | Y_n, Delta_n)
+            h_contrib = h_y_delta(p_x_given_y0_at_reception_vec,
+                                  A_aoi_pow,
+                                  x_symbols=np.array(params.X_symbols))
+            
+            entropy_evolution[t-num_burn_in_steps] = h_contrib
+            total_entropy_contribution += h_contrib
+            num_valid_steps_for_avg += 1
+    
+    estimated_avg_entropy = total_entropy_contribution / num_valid_steps_for_avg if num_valid_steps_for_avg > 0 else 0.0
+    
+    return estimated_avg_entropy, entropy_evolution, (y_sequence, x_true_sequence)
+
 def run_monte_carlo_simulation(params: SimulationParameters,
                                num_time_steps: int,
                                num_burn_in_steps: int,
@@ -58,6 +160,8 @@ def run_monte_carlo_simulation(params: SimulationParameters,
 
     # Data collectors
     entropy_evolution = np.empty(num_time_steps, dtype=float) # To store H(X_t | Y_n, Delta_n) at each step after burn-in
+    X_sequence = np.empty(num_burn_in_steps + num_time_steps, dtype=int)
+    Y_sequence = np.empty(num_burn_in_steps + num_time_steps, dtype=int)
     total_entropy_contribution = 0.0
     num_valid_steps_for_avg = 0
 
@@ -79,6 +183,7 @@ def run_monte_carlo_simulation(params: SimulationParameters,
     for t in range(num_burn_in_steps + num_time_steps):
         # A. Source Evolution
         current_x_source_state = dtmc.step()
+        X_sequence[t] = current_x_source_state
 
         # B. Node Observation and Transmission
         rand_perception = rng.random(num_nodes)
@@ -103,6 +208,8 @@ def run_monte_carlo_simulation(params: SimulationParameters,
             current_aoi = 0
         else:
             current_aoi += 1
+        
+        Y_sequence[t] = last_received_y
 
         # D. Entropy Contribution (after burn-in)
         if t >= num_burn_in_steps:
@@ -143,7 +250,8 @@ def run_monte_carlo_simulation(params: SimulationParameters,
         print("Warning: No valid steps for entropy averaging after burn-in.")
 
 
-    return estimated_avg_entropy, entropy_evolution
+    return estimated_avg_entropy, entropy_evolution, (Y_sequence[num_burn_in_steps:], X_sequence[num_burn_in_steps:])
+
 
 # vertion with location aware mechanism
 def run_monte_carlo_simulation_spatial(params: SimulationParameters,

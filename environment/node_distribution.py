@@ -1,7 +1,7 @@
 # node_distribution.py
 import numpy as np
 import math
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 # Assuming node.py is in the same directory or accessible as a module
 # For direct execution, use: from node import Node
@@ -22,11 +22,11 @@ class NodeDistribution(object):
                 rho: float,
                 unit_radius: float, 
                 K: int, 
-                zeta:float|np.ndarray, 
-                alpha:float, 
+                zeta: Union[float, np.ndarray], 
+                alpha: float, 
                 seed: int = None, 
-                zeta_bucket:bool=False,
-                fixed_nodes_per_region:bool=False):
+                zeta_bucket: bool = False,
+                fixed_nodes_per_region: bool = False):
         """
         :param rho: The density of the nodes in the circle.
         :type rho: float

@@ -1,7 +1,7 @@
 # forgetful_receiver_funcs.py
 import numpy as np
 from numba import jit
-from typing import List
+from typing import List, Union
 import os
 import pickle
 
@@ -96,7 +96,7 @@ def p_y(y:int, pi:np.ndarray, K:int, tx_prob_per_bucket:np.ndarray, lambda_mat:n
     prob_y_given_1_0 = prob_y_given_x_0(1, y, K, tx_prob_per_bucket, lambda_mat, p_d_vector)
     return prob_y_given_0_0 * pi[0] + prob_y_given_1_0 * pi[1]
 
-def ps_calc(m:int, zeta:float|List, epsilon:float): # Renamed to ps_calc to avoid conflict if ps is a variable
+def ps_calc(m: int, zeta: Union[float, List], epsilon: float): # Renamed to ps_calc to avoid conflict if ps is a variable
     """
     Probability of the receiver getting an update from the m nodes.
     The original used PoiBin(...).pmf(1) for exactly one success.
@@ -137,13 +137,13 @@ def overall_entropy(A:np.ndarray,
                     pi:np.ndarray, 
                     K:int, 
                     m:int, 
-                    zeta:float|List[float], 
+                    zeta: Union[float, List[float]], 
                     epsilon:float,
                     alpha:float,
                     R_unit:float,
                     X_symbols:List[int],
                     Y_symbols:List[int],
-                    tx_prob_per_bucket: List|np.ndarray, 
+                    tx_prob_per_bucket: Union[List, np.ndarray], 
                     max_delta_considered: int = 20):
     """
     Calculates the theoretical average entropy H(X_t | Y_n, Delta_n).

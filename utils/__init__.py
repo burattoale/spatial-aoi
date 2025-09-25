@@ -2,5 +2,6 @@ from .linalg_func import _compute_steady_state
 from .simulation_parameters import SimulationParameters
 from .hmm_funcs import *
 from .forgetful_receiver_funcs import *
-from .forgetful_mc_simulations import run_monte_carlo_simulation_spatial, run_monte_carlo_simulation
+from .forgetful_mc_simulations import run_monte_carlo_simulation_spatial, run_monte_carlo_simulation, run_monte_carlo_simulation_forced_sequence
 from .matrix_builders import generate_lambda_matrix
+from .stif_h_agnostic_python import stif_h_agnostic_new

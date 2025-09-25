@@ -10,8 +10,7 @@ import json
 
 from utils import SimulationParameters
 from hmm_joint_prob import run_hmm_simulation
-from utils import run_monte_carlo_simulation
-from joblib import Parallel, delayed
+from utils import stif_h_agnostic_new
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the main script with specified arguments.")
@@ -90,14 +89,21 @@ if __name__ == "__main__":
             if not LOC_AWARE and not NON_BINARY:
                 forgetful_params = deepcopy(hmm_params)
                 forgetful_params.Y_symbols = deepcopy(forgetful_params.X_symbols)
-                forgetful_res = Parallel(n_jobs=PARALLEL_JOBS,)(
-                    delayed(run_monte_carlo_simulation)(forgetful_params, sim_length, 100, seed=i) for i in range(num_simulations)
+                # Use STIF H-agnostic implementation instead of parallel Monte Carlo
+                H_forgetful, _, _ = stif_h_agnostic_new(
+                    R=forgetful_params.R_unit,
+                    K=forgetful_params.K, 
+                    alpha=forgetful_params.alpha,
+                    rho=forgetful_params.rho,
+                    zeta=forgetful_params.zeta,
+                    q=forgetful_params.q,
+                    beta=forgetful_params.eta,  # eta corresponds to beta in STIF
+                    epsilon=forgetful_params.epsilon
                 )
-                averages_forgetful = [r[1] for r in forgetful_res]
                 if args.alpha_sweep:
-                    results['forgetful'][f"alpha:{eta}"][k] = np.mean(averages_forgetful)
+                    results['forgetful'][f"alpha:{eta}"][k] = H_forgetful
                 else:
-                    results['forgetful'][f"eta:{eta}"][k] = np.mean(averages_forgetful)
+                    results['forgetful'][f"eta:{eta}"][k] = H_forgetful
             # save
             # if alpha sweep modify the file name to have a trailing _alpha still reading from the configs
             if args.alpha_sweep:
