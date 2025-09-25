@@ -1,7 +1,7 @@
 {
     "q":0.005,
     "eta":1,
-    "zeta":5e-4,
+    "zeta":1e-4,
     "epsilon":0.1,
     "rho":0.05,
     "alpha":0.02,
