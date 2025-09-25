@@ -6,15 +6,15 @@
     "rho":0.05,
     "alpha":0.02,
     "beta":0,
-    "R_unit":5,
+    "R_unit":10,
     "X_symbols": [0,1],
     "noise_distribution": "gaussian",
 
-    "K_range": [1, 70],
+    "K_range": [1, 65],
     "eta_range": [1, 30],
 
-    "num_simulations":100,
-    "num_steps":100000,
+    "num_simulations":50,
+    "num_steps":20000,
 
     "loc_aware":true,
     "output_file": "results/binary_source_loc_aware.pkl"
