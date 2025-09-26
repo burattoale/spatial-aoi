@@ -5,3 +5,4 @@ from .forgetful_receiver_funcs import *
 from .forgetful_mc_simulations import run_monte_carlo_simulation_spatial, run_monte_carlo_simulation, run_monte_carlo_simulation_forced_sequence
 from .matrix_builders import generate_lambda_matrix
 from .stif_h_agnostic_python import stif_h_agnostic_new
+from .stif_h_agnostic_loc_aware import stif_h_agnostic_loc_aware
