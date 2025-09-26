@@ -1,0 +1,23 @@
+{
+    "q":0.005,
+    "eta":1,
+    "zeta":1e-4,
+    "epsilon":0.1,
+    "rho":0.05,
+    "alpha":0.06,
+    "beta":0,
+    "R_unit":10,
+    "X_symbols": [0,1],
+    "noise_distribution": "gaussian",
+
+    "K_range": [1, 65],
+    "eta_range": [1, 30],
+
+    "num_simulations":50,
+    "num_steps":20000,
+
+    "parallel_jobs":5,
+
+    "loc_aware":false,
+    "output_file": "results/binary_spawc_alpha006.pkl"
+}

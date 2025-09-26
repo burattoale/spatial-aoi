@@ -10,7 +10,7 @@ import json
 
 from utils import SimulationParameters
 from hmm_joint_prob import run_hmm_simulation
-from utils import stif_h_agnostic_new
+from utils import stif_h_agnostic_new, stif_h_agnostic_loc_aware
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the main script with specified arguments.")
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     results['hmm_err'] = {}
     eta_list = range(eta_min, eta_max + 1)#[1, 5, 9, 25]
     if args.alpha_sweep:
-        eta_list = [0.02, 0.05, 0.1]
+        eta_list = [0.02, 0.06, 0.1]
         print("Running alpha sweep")
     for eta in tqdm(eta_list):#range(1, 50,1)):
         if args.alpha_sweep:
@@ -85,21 +85,40 @@ if __name__ == "__main__":
                 results['hmm'][f"eta:{eta}"][k] = np.mean(averages_hmm)
                 results['hmm_err'][f"eta:{eta}"][k] = np.mean(averages_hmm_est_error)
             # forgetful
-            # do not do the locaion aware stuff
+            # do not do the location aware stuff
             if not LOC_AWARE and not NON_BINARY:
                 forgetful_params = deepcopy(hmm_params)
                 forgetful_params.Y_symbols = deepcopy(forgetful_params.X_symbols)
-                # Use STIF H-agnostic implementation instead of parallel Monte Carlo
-                H_forgetful, _, _ = stif_h_agnostic_new(
-                    R=forgetful_params.R_unit,
-                    K=forgetful_params.K, 
-                    alpha=forgetful_params.alpha,
-                    rho=forgetful_params.rho,
-                    zeta=forgetful_params.zeta,
-                    q=forgetful_params.q,
-                    beta=forgetful_params.eta,  # eta corresponds to beta in STIF
-                    epsilon=forgetful_params.epsilon
-                )
+                
+                # Choose between standard and location-aware STIF based on LOC_AWARE flag
+                # Note: For forgetful receiver, we can use location-aware STIF when available
+                use_location_aware = hasattr(configs, 'use_location_aware_stif') and configs.get('use_location_aware_stif', False)
+                
+                if use_location_aware:
+                    # Use location-aware STIF H-agnostic implementation
+                    H_forgetful, _, _ = stif_h_agnostic_loc_aware(
+                        R=forgetful_params.R_unit,
+                        K=forgetful_params.K, 
+                        alpha=forgetful_params.alpha,
+                        rho=forgetful_params.rho,
+                        zeta=forgetful_params.zeta,
+                        q=forgetful_params.q,
+                        eta=forgetful_params.eta,
+                        epsilon=forgetful_params.epsilon
+                    )
+                else:
+                    # Use standard STIF H-agnostic implementation
+                    H_forgetful, _, _ = stif_h_agnostic_new(
+                        R=forgetful_params.R_unit,
+                        K=forgetful_params.K, 
+                        alpha=forgetful_params.alpha,
+                        rho=forgetful_params.rho,
+                        zeta=forgetful_params.zeta,
+                        q=forgetful_params.q,
+                        eta=forgetful_params.eta,
+                        epsilon=forgetful_params.epsilon
+                    )
+                
                 if args.alpha_sweep:
                     results['forgetful'][f"alpha:{eta}"][k] = H_forgetful
                 else:

@@ -9,7 +9,7 @@ from numba import jit
 
 
 def stif_h_agnostic_new(R: float, K: int, alpha: float, rho: float, zeta: float, 
-                        q: float, beta: float, epsilon: float = 0.0) -> Tuple[float, np.ndarray, np.ndarray]:
+                        q: float, eta: float, epsilon: float = 0.0) -> Tuple[float, np.ndarray, np.ndarray]:
     """
     Python translation of MATLAB function stif_H_agnostic_new
     
@@ -27,8 +27,8 @@ def stif_h_agnostic_new(R: float, K: int, alpha: float, rho: float, zeta: float,
         Transmission probability
     q : float
         Markov chain parameter (transition probability)
-    beta : float
-        Markov chain parameter
+    eta : float
+        Markov chain asymmetry parameter
     epsilon : float, optional
         Transmission erasure probability (default 0.0)
         
@@ -59,12 +59,12 @@ def stif_h_agnostic_new(R: float, K: int, alpha: float, rho: float, zeta: float,
     ps = zeta * (1 - epsilon) * n * (1 - zeta * (1 - epsilon)) ** (n - 1)
     
     # Markov process
-    pi0 = beta / (1 + beta)
+    pi0 = eta / (1 + eta)
     pi1 = 1 - pi0
     
     # Transition matrix
     A = np.array([[1 - q, q],
-                  [beta * q, 1 - beta * q]])
+                  [eta * q, 1 - eta * q]])
     
     # Find maxAge s.t. P(age <= maxAge) = 0.99
     max_age = 5000
@@ -219,9 +219,9 @@ def test_stif_h_agnostic():
     rho = 1.0
     zeta = 0.1
     q = 0.1
-    beta = 2.0
+    eta = 2.0
     
-    H, cdf_h, gamma_vec = stif_h_agnostic_new(R, K, alpha, rho, zeta, q, beta)
+    H, cdf_h, gamma_vec = stif_h_agnostic_new(R, K, alpha, rho, zeta, q, eta)
     
     print(f"Average entropy H: {H:.6f}")
     print(f"CDF shape: {cdf_h.shape}")

@@ -12,9 +12,9 @@ from utils import overall_entropy, SimulationParameters
 
 def do_simulation_pair(params:SimulationParameters, params_loc_aware:SimulationParameters, sim_length:int, seed=None):
     params.beta = 0
-    time_evolution, mean_e_hmm, mean_est_error, mean_est_err_short, _ = hmm_entropy(params, sim_length, seed=seed)
+    time_evolution, mean_e_hmm, mean_est_error, mean_est_err_short, _, _ = hmm_entropy(params, sim_length, seed=seed)
 
-    time_evolution_loc_aware, mean_e_hmm_loc_aware, mean_est_error_loc, mean_est_e_loc_short, _ = hmm_entropy(params_loc_aware, sim_length, loc_aware=True, seed=seed)
+    time_evolution_loc_aware, mean_e_hmm_loc_aware, mean_est_error_loc, mean_est_e_loc_short, _, _ = hmm_entropy(params_loc_aware, sim_length, loc_aware=True, seed=seed)
     time_evolution_loc_aware_mc, mean_e_hmm_loc_aware_mc, mean_est_error_loc_mc, mean_est_e_loc_short_mc, _ = run_hmm_simulation(params_loc_aware, num_time_steps=sim_length, loc_aware=True, seed=seed)
      
 

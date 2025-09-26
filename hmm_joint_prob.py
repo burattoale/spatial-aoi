@@ -39,6 +39,8 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, seed=N
     alpha_vec = np.empty(2) # forward variables
     cs = np.zeros(simulation_length) # scaling coefficients
     entropies = np.zeros(simulation_length)
+    cond_probs_x1 = np.zeros(simulation_length)
+    cond_probs_x = np.zeros((simulation_length, len(local_params.X_symbols)))
     pred_X = np.empty_like(X_true)
 
     print(f"Starting simulation with {simulation_length} steps")
@@ -71,6 +73,8 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, seed=N
         alpha_vec /= cs[t] # normalize the forward probabilities
 
         p_x_y_norm = alpha_vec / np.sum(alpha_vec)
+        cond_probs_x1[t] = p_x_y_norm[1]
+        cond_probs_x[t] = p_x_y_norm
         entropy = - np.sum(p_x_y_norm * np.log2(p_x_y_norm+1e-12))
         entropies[t] = entropy
         pred_X = np.argmax(p_x_y_norm)
@@ -91,7 +95,16 @@ def hmm_entropy(params:SimulationParameters, simulation_length:int=10000, seed=N
     estimation_error_prob = np.sum(np.abs(X_path - X_true)) / simulation_length
     short_est_prob = np.sum(np.abs(X_path - X_true)) / simulation_length
 
-    return entropies, np.mean(entropies), estimation_error_prob, short_est_prob, Y
+    # Compute CDF of entropy values
+    max_entropy = np.max(entropies)
+    min_entropy = np.min(entropies)
+    gamma_vec = np.linspace(min_entropy, max_entropy, 1000)
+    cdf_h = np.zeros(len(gamma_vec))
+    
+    for i, threshold in enumerate(gamma_vec):
+        cdf_h[i] = np.sum(entropies <= threshold) / len(entropies)
+
+    return entropies, np.mean(entropies), estimation_error_prob, short_est_prob, (Y, X_true, cond_probs_x1, cond_probs_x), (cdf_h, gamma_vec)
 
 
 def run_hmm_simulation(params: SimulationParameters,
@@ -302,7 +315,7 @@ if __name__ == "__main__":
 
     local_params = SimulationParameters(q, eta, zeta, epsilon, rho=rho, m=m, K=K, alpha=alpha, R_unit=R, X_symbols=x_symbols, Y_symbols=y_symbols)
 
-    entropies, _, est_error_no_loc, _ = hmm_entropy(local_params, sim_length, loc_aware=False)
+    entropies, _, est_error_no_loc, _, _, (cdf_h_no_loc, gamma_vec_no_loc) = hmm_entropy(local_params, sim_length, loc_aware=False)
     mc_entropies, _, _, _, _ = run_hmm_simulation(local_params, sim_length, loc_aware=False)
 
 
@@ -322,7 +335,7 @@ if __name__ == "__main__":
     plt.savefig("plots/sequence_entropy_1.png", bbox_inches="tight", pad_inches=0)
     plt.close()
 
-    entropies, _, est_error_yes_loc, _ = hmm_entropy(local_params, sim_length, loc_aware=True)
+    entropies, _, est_error_yes_loc, _, _, (cdf_h_yes_loc, gamma_vec_yes_loc) = hmm_entropy(local_params, sim_length, loc_aware=True)
     mc_entropies, _, _, _, _ = run_hmm_simulation(local_params, sim_length, loc_aware=True)
 
     print(f"Estimation error NO localization aware: {est_error_no_loc}")
