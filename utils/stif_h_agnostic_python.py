@@ -56,7 +56,7 @@ def stif_h_agnostic_new(R: float, K: int, alpha: float, rho: float, zeta: float,
     
     # Probability of successfully receiving an update
     n = int(np.ceil(np.pi * rho * R_max ** 2))
-    ps = zeta * (1 - epsilon) * n * (1 - zeta * (1 - epsilon)) ** (n - 1)
+    ps = zeta * n * (1 - zeta) ** (n - 1)
     
     # Markov process
     pi0 = eta / (1 + eta)
