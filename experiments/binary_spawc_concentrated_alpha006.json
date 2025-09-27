@@ -6,11 +6,11 @@
     "rho":0.05,
     "alpha":0.06,
     "beta":0,
-    "R_unit":5,
+    "R_unit":2,
     "X_symbols": [0,1],
     "noise_distribution": "gaussian",
 
-    "K_range": [40, 60],
+    "K_range": [110, 135],
     "eta_range": [1, 7],
     "eta_step": 0.5,
 
@@ -20,5 +20,5 @@
     "parallel_jobs":5,
 
     "loc_aware":false,
-    "output_file": "results/binary_spawc_concentrated006.pkl"
+    "output_file": "results/binary_spawc_concentrated006_superfine.pkl"
 }
