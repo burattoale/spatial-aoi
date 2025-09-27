@@ -1,4 +1,4 @@
-from utils import prob_x_given_y_0, SimulationParameters, lam, generate_lambda_matrix
+from utils import prob_x_given_y_0, SimulationParameters, lam, generate_lambda_matrix, overall_entropy, run_monte_carlo_simulation
 from environment import DTMC
 from hmm_joint_prob import run_hmm_simulation
 
@@ -9,8 +9,8 @@ from tqdm import tqdm
 
 params = SimulationParameters(
         q=0.005,
-        eta=10,
-        zeta=5e-4, # Example: list of base probabilities. NodeDistribution will use this.
+        eta=5,
+        zeta=5e-5, # Example: list of base probabilities. NodeDistribution will use this.
         epsilon=0.1,
         rho=0.05,
         m_override=None,
@@ -28,7 +28,25 @@ entropy = 0
 for t in range(50):
     p_x_vector = p_x_vector_0 @ np.linalg.matrix_power(dtmc.A, t)
     entropy = - np.sum(p_x_vector * np.log2(p_x_vector))
+    print(p_x_vector)
     print(entropy)
+
+eq_ent = overall_entropy(dtmc.A, 
+                dtmc.pi, 
+                params.K, 
+                params.m,
+                params.zeta, 
+                params.epsilon, 
+                params.alpha, 
+                params.R_unit, 
+                params.X_symbols, 
+                params.Y_symbols,
+                np.array([params.zeta]*params.K), 
+                max_delta_considered=10000
+                )
+print(f"Theoretical equilibrium entropy: {eq_ent}")
+sim_ent, _ = run_monte_carlo_simulation(params, 100000, 1000, seed=42)
+print(f"Monte Carlo simulated entropy: {sim_ent}")
 
 # evaluate two extreme configurations
 params.Y_symbols = [0,1,2]

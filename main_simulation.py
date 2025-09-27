@@ -43,19 +43,19 @@ if __name__ == "__main__":
     initial_params = SimulationParameters(
         q=0.005,
         eta=1,
-        zeta=5e-4, # Example: list of base probabilities. NodeDistribution will use this.
+        zeta=1e-4, # Example: list of base probabilities. NodeDistribution will use this.
         epsilon=0.1,
         rho=0.05,
         m_override=None,
-        K=5, # Initial K for the first plot
+        K=20, # Initial K for the first plot
         alpha=0.02,
         beta=0, # Default beta, will be overridden in the loop
         R_unit=10
     )
 
     # Monte Carlo settings for the first plot
-    num_simulation_runs = 10000 # Reduced for faster example
-    num_burn_in = 1000        # Reduced for faster example
+    num_simulation_runs = 100000 # Reduced for faster example
+    num_burn_in = 10000        # Reduced for faster example
     simulation_seed = 0
 
     print(f"Starting initial Monte Carlo simulation with parameters: {initial_params}")
@@ -83,12 +83,15 @@ if __name__ == "__main__":
 
     if m_calc_initial > 0:
         p_success_initial_k = ps_calc(m_calc_initial, _node_dist_initial.tx_probabilities, initial_params.epsilon)
-        max_delta_initial_k = 10000#max(50, int(2 / (p_success_initial_k + 1e-9)))
+        max_delta_initial_k = 1000#max(50, int(2 / (p_success_initial_k + 1e-9)))
         theoretical_entropy_initial = overall_entropy(
             A=dtmc_theoretical.A, pi=dtmc_theoretical.pi, K=initial_params.K,
-            R_unit=initial_params.R_unit, alpha=initial_params.alpha, m=m_calc_initial,
+            R_unit=initial_params.R_unit, 
+            X_symbols=initial_params.X_symbols,
+            Y_symbols=initial_params.Y_symbols,
+            alpha=initial_params.alpha, m=m_calc_initial,
             zeta=_node_dist_initial.tx_probabilities, epsilon=initial_params.epsilon,
-            prob_per_bucket=_node_dist_initial.tx_prob_bucket, max_delta_considered=max_delta_initial_k
+            tx_prob_per_bucket=_node_dist_initial.tx_prob_bucket, max_delta_considered=max_delta_initial_k
         )
         print(f"Theoretical H(X_t | Y_n, Delta_n) (for K={initial_params.K}, beta={initial_params.beta}): {theoretical_entropy_initial:.4f}")
     else:

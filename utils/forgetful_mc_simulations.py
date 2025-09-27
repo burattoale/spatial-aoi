@@ -280,7 +280,6 @@ def run_monte_carlo_simulation_spatial(params: SimulationParameters,
                                  K=params.K,
                                  zeta = params.zeta,
                                  alpha=params.alpha,
-                                 beta=params.beta,
                                  seed=int(node_dist_seed),
                                  zeta_bucket=zeta_bucket)
 
