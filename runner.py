@@ -37,6 +37,7 @@ if __name__ == "__main__":
         )
     
     eta_min, eta_max = configs['eta_range']
+    eta_step = configs.get('eta_step', 1)
     k_min, k_max = configs['K_range']
     sim_length = configs['num_steps']
     num_simulations = configs['num_simulations']
@@ -50,7 +51,7 @@ if __name__ == "__main__":
     results['hmm'] = {}
     results['forgetful'] = {}
     results['hmm_err'] = {}
-    eta_list = range(eta_min, eta_max + 1)#[1, 5, 9, 25]
+    eta_list = range(eta_min, eta_max + 1, eta_step)#[1, 5, 9, 25]
     if args.alpha_sweep:
         eta_list = [0.02, 0.06, 0.1]
         print("Running alpha sweep")
