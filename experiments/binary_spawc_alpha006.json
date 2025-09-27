@@ -14,7 +14,7 @@
     "eta_range": [1, 30],
 
     "num_simulations":50,
-    "num_steps":20000,
+    "num_steps":30000,
 
     "parallel_jobs":5,
 
