@@ -11,7 +11,7 @@
     "noise_distribution": "gaussian",
 
     "K_range": [110, 136],
-    "eta_range": [1, 7],
+    "eta_range": [8, 30],
     "eta_step": 0.5,
 
     "num_simulations":80,
@@ -20,5 +20,5 @@
     "parallel_jobs":10,
 
     "loc_aware":false,
-    "output_file": "results/binary_spawc_concentrated006_superfine.pkl"
+    "output_file": "results/binary_spawc_concentrated006_superfine30_last.pkl"
 }
