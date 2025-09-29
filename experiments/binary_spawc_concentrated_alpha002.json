@@ -12,7 +12,7 @@
 
     "K_range": [110, 136],
     "eta_range": [8, 30],
-    "eta_step": 0.5,
+    "eta_step": 1,
 
     "num_simulations":80,
     "num_steps":60000,
